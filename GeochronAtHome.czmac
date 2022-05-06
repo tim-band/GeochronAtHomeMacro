@@ -1,0 +1,987 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Script>
+  <Context>Zen26</Context>
+  <Version>1.0</Version>
+  <Language>Python</Language>
+  <Text># Getting data for Geochron@Home
+# Data:
+# 1. Folder for the data
+# 2. POI file
+# 3. Tiled circularly polarized light image of minerals
+# 4. Tiled transmitted light image of mica (if applicable)
+# 5. Mineral to mica matrix file (if applicable)
+# 6. Mineral Z-stacks
+# 7. Mica Z-stacks
+# 8. Dosimeter images (images sampled from mica with known area marked)
+#
+# Actions:
+# Add registration points [r] (1 -&gt; 2a)
+# Add mineral extent points [x] (1 -&gt; 2b)
+# Add mica extent points [m] (1 -&gt; 2c)
+# Create mineral tiled image (1,2b -&gt; 3)
+# Create mica tiled image (1,2c -&gt; 4)
+# Launch Manimal for matrix (1,3,4 -&gt; 5)
+# Launch Manimal for POIs [r,i] (1,3 -&gt; 2)
+# Reregister POIs (2a,2? -&gt; 2a,2?)
+# Fix POIs (1,2 -&gt; 2)
+# Fix matrix (1,2,5 -&gt; 2(mark some unsuitable),5)
+# Create mineral Z-stacks (1,2 -&gt; 6)
+# Create mica Z-stacks (1,2,5 -&gt; 7)
+# Capture dosimeter images from mica (2c -&gt; 8)
+# Exit
+
+import linear
+import math
+import os
+import random
+import subprocess
+import time
+import workarounds
+
+reload(workarounds)
+reload(linear)
+
+import clr
+
+clr.AddReference('System.Windows.Forms')
+
+from System.Windows.Forms import (
+    AnchorStyles, Application, AutoSizeMode,
+    Form, Label, ListBox, TableLayoutPanel
+)
+
+zen = workarounds.Workarounds(Zen, Zeiss)
+
+hs_reflected = 'AcquireStacksReflected'
+hs_transmitted = 'AcquireStacksTransmitted'
+
+tl_experiment_name = 'AcquireStacksTileTL'
+rl_experiment_name = 'AcquireStacksFocusRL'
+coarse_focus_experiment_name = 'AcquireStacksFocusRLCoarse'
+tl_coarse_focus_experiment_name = 'AcquireStacksFocusTLCoarse'
+
+camera_setting = '100ms'
+
+class SelectForm(Form):
+    def __init__(self, title, label, options):
+        super(SelectForm, self).__init__()
+        self.Text = title
+        self.AutoSize = True
+        self.AutoSizeMode = AutoSizeMode.GrowAndShrink
+        self.layout = TableLayoutPanel()
+        self.layout.AutoSize = True
+        self.layout.AutoSizeMode = AutoSizeMode.GrowAndShrink
+        self.Controls.Add(self.layout)
+        self.label = Label()
+        self.label.Text = label
+        self.layout.Controls.Add(self.label, 0, 0)
+        self.combo = ListBox()
+        for s in options:
+            self.combo.Items.Add(s)
+        self.combo.SetSelected(0, True)
+        self.layout.Controls.Add(self.combo, 1, 0)
+        self.TopMost = True
+    def show(self):
+        self.Show()
+    def result(self):
+        return self.combo.SelectedItem
+    def close(self):
+        self.Close()
+        self.Dispose()
+
+class AdjustForm(SelectForm):
+    OK = 'set to current position and focus'
+    LEAVE = 'leave as it is'
+    MARK = 'mark as unsuitable'
+    EXIT = 'exit task'
+    EXIT_CANCEL = "don't exit, carry on adjusting!"
+    EXIT_KEEP = 'exit, leaving remaining POIs as they are'
+    EXIT_UNSUITABLE = 'exit and mark remaining POIs as unsuitable'
+    EXIT_KEEP_ALL = 'exit, keeping all points'
+    TITLE = 'Choose what should happen to this POI'
+    LABEL = 'What should we do with this POI?'
+    def __init__(self, objects):
+        super(AdjustForm, self).__init__(
+            self.TITLE,
+            self.LABEL,
+            [x for x in [self.OK, self.LEAVE, self.MARK, self.EXIT] if x]
+        )
+        self.objects = list(objects)
+        self.total_count = len(self.objects)
+        self.count = 0
+        self.action = None
+        self.exiting = False
+    def get_exit_action(self):
+        action = 'action'
+        window = Zen.Windows.CreateWindow('Exit adjustment?')
+        window.AddDropDown(
+            action,
+            'What now?',
+            [self.EXIT_CANCEL, self.EXIT_KEEP, self.EXIT_UNSUITABLE, self.EXIT_KEEP_ALL],
+            0
+        )
+        result = zen.show_window(window)
+        return result.GetValue(action)
+    def try_update_adjust_action(self):
+        if self.exiting:
+            return True
+        Zen.Application.Pause('Adjust position and focus ({0} of {1})'.format(
+            self.count,
+            self.total_count
+        ))
+        self.action = self.result()
+        if self.action != self.EXIT:
+            return True
+        exit_action = self.get_exit_action()
+        if exit_action == self.EXIT_UNSUITABLE:
+            self.exiting = True
+            self.action = self.MARK
+            return True
+        elif exit_action == self.EXIT_KEEP:
+            self.exiting = True
+            self.action = self.LEAVE
+            return True
+        elif exit_action == self.EXIT_KEEP_ALL:
+            self.action = self.EXIT
+            return True
+        return False
+    def update_adjust_action(self):
+        """
+        Ask for the action repeatedly until the user stops saying "exit, keep editing"
+        """
+        self.show()
+        self.count += 1
+        while not self.try_update_adjust_action():
+            pass
+    def drive(self, o, count, total_count):
+        pass
+    def do_adjust(self, o):
+        pass
+    def do_mark(self, o):
+        pass
+    def unmark_all(self):
+        pass
+    def undrive(self, o):
+        pass
+    def run(self):
+        zen.show_live()
+        count = 0
+        for o in self.objects:
+            driven = False
+            if not self.exiting:
+                self.drive(o, self.count, self.total_count)
+                driven = True
+            self.update_adjust_action()
+            if self.action == self.OK:
+                self.do_adjust(o)
+                count += 1
+            elif self.action == self.MARK:
+                self.do_mark(o)
+                count += 1
+            if driven:
+                self.undrive(o)
+            if self.action == self.EXIT:
+                # User wants to exit, saving nothing
+                self.unmark_all()
+                return 0
+        return count
+    def __enter__(self):
+        return self
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
+class Poi(object):
+    def __init__(self, table, row):
+        self.table = table
+        self.row = row
+    @property
+    def table_row(self):
+        return self.row
+    @property
+    def x(self):
+        return float(self.table.GetValue(self.row, 1))
+    @x.setter
+    def x(self, value):
+        self.table.SetValue(self.row, 1, value)
+    @property
+    def y(self):
+        return float(self.table.GetValue(self.row, 2))
+    @y.setter
+    def y(self, value):
+        self.table.SetValue(self.row, 2, value)
+    @property
+    def z(self):
+        return float(self.table.GetValue(self.row, 3))
+    @z.setter
+    def z(self, value):
+        self.table.SetValue(self.row, 3, value)
+    @property
+    def poi_type(self):
+        return self.table.GetValue(self.row, 0)
+    @property
+    def name(self):
+        return self.table.GetValue(self.row, 4)
+    @name.setter
+    def name(self, value):
+        self.table.SetValue(self.row, 4, value)
+
+class Documents(object):
+    def load(self, filename):
+        """ Load a csv file as a table """
+        return Zen.Application.LoadTable(
+            os.path.join(self.folder, filename)
+        )
+    def exists(self, filename):
+        return os.path.exists(
+            os.path.join(self.folder, filename)
+        )
+    def save_poi(self):
+        self.poi.Save(os.path.join(self.folder, 'poi.csv'))
+    def save_matrix(self):
+        self.matrix_table.Save(os.path.join(self.folder, 'matrix.csv'))
+    def save_current_matrix(self):
+        self.current_matrix_table.Save(os.path.join(self.folder, 'current_reg_matrix.csv'))
+    def save_current_matrix_as(self, path):
+        if self.current_matrix_table:
+            self.current_matrix_table.Save(path)
+    def __init__(self, folder):
+        self.folder = folder
+        self.poi = self.load('poi.csv')
+        if not self.poi:
+            self.poi = ZenTable('poi.csv')
+            self.poi.Columns.Add('type')
+            self.poi.Columns.Add('x')
+            self.poi.Columns.Add('y')
+            self.poi.Columns.Add('z')
+            self.poi.Columns.Add('name')
+        # Transformation from minerals image to equivalent points on mica image
+        self.matrix_table = self.load('matrix.csv')
+        self.matrix = linear.table_to_matrix(self.matrix_table)
+        # Transformation from project co-ordinates to current stage co-ordinates
+        self.current_matrix_table = self.load('current_reg_matrix.csv')
+        self.current_matrix = linear.table_to_matrix(self.current_matrix_table)
+        self.has_minerals = self.exists('minerals.czi')
+        self.has_mica = self.exists('mica.czi')
+        self.grain_folder_number = 1
+    def get_current_matrix_table(self):
+        if self.current_matrix_table:
+            return self.current_matrix_table
+        m = ZenTable('current_reg_matrix.csv')
+        m.Columns.Add('x')
+        m.Columns.Add('y')
+        m.Columns.Add('t')
+        m.Rows.Add(1, 0, 0)
+        m.Rows.Add(0, 1, 0)
+        self.current_matrix_table = m
+        self.current_matrix = linear.table_to_matrix(m)
+        return m
+    def get_pois(self, type='i', ignore_unsuitable=True, ignore_done=True):
+        for i in range(self.poi.RowCount):
+            t = self.poi.GetValue(i,0)
+            name = self.poi.GetValue(i,4)
+            is_blank = name == ''
+            is_unsuitable = not is_blank and name[0] == '#'
+            is_done = not is_blank and not is_unsuitable and os.path.exists(name)
+            ok = True
+            if is_unsuitable and ignore_unsuitable:
+                ok = False
+            if is_done and ignore_done:
+                ok = False
+            if t == type and ok:
+                yield Poi(self.poi, i)
+    def all_pois(self):
+        for i in range(self.poi.RowCount):
+            yield Poi(self.poi, i)
+    def drive_to_xyz(self, x, y, **kwargs):
+        if self.current_matrix:
+            (x,y) = linear.transform(self.current_matrix, x, y)
+        zen.move_stage(x, y, **kwargs)
+    def drive_to_poi(self, p):
+        self.drive_to_xyz(p.x, p.y, z=p.z)
+    def drive_to_poi_mica(self, p):
+        (x,y) = linear.transform(self.matrix, p.x, p.y)
+        self.drive_to_xyz(x, y)
+    def stage_position(self):
+        """
+        returns the stage position in project coordinates
+        """
+        x = Zen.Devices.Stage.ActualPositionX
+        y = Zen.Devices.Stage.ActualPositionY
+        if self.current_matrix:
+            (x,y) = linear.inv_transform(self.current_matrix, x, y)
+        return (x, y, Zen.Devices.Focus.ActualPosition)
+    def delete(self, filename):
+        path = os.path.join(self.folder, filename)
+        if not os.path.exists(path):
+            return
+        doc = Zen.Application.Documents.GetByFileName(path)
+        if doc:
+            doc.Close()
+        os.remove(path)
+    def delete_minerals(self):
+        self.delete('minerals.czi')
+        self.has_minerals = False
+    def delete_mica(self):
+        self.delete('mica.czi')
+        self.has_mica = False
+    def delete_current_matrix(self):
+        self.delete('current_reg_matrix.csv')
+        self.current_matrix = None
+        self.current_matrix_table = None
+    def get_next_grain_folder(self):
+        pattern = os.path.join(self.folder, 'Grain') + '{1:02d}'
+        while True:
+            name = pattern.format(folder, self.grain_folder_number)
+            if not os.path.exists(name):
+                return name
+            self.grain_folder_number += 1
+
+class AdjustPoiForm(AdjustForm):
+    HARDWARE_SETTING = hs_transmitted
+    CAMERA_SETTING = camera_setting
+    def __init__(self, pois, docs):
+        super(AdjustPoiForm, self).__init__(pois)
+        self.docs = docs
+        zen.set_hardware(self.HARDWARE_SETTING, self.CAMERA_SETTING)
+    def drive(self, poi, count, total_count):
+        self.docs.drive_to_poi(poi)
+    def do_adjust(self, poi):
+        (poi.x, poi.y, poi.z) = self.docs.stage_position()
+    def do_mark(self, poi):
+        poi.name = '# Unsuitable'
+
+class AdjustMatrixForm(AdjustForm):
+    OK = 'set to current position'
+    LEAVE = 'ignore this point for now'
+    MARK = 'mark this POI as unsuitable'
+    EXIT = 'exit task'
+    EXIT_KEEP = 'exit, ignoring remaining points'
+    EXIT_UNSUITABLE = 'exit and mark remaining POIs as unsuitable'
+    HARDWARE_SETTING = hs_transmitted
+    CAMERA_SETTING = camera_setting
+    def __init__(self, pois, docs):
+        super(AdjustMatrixForm, self).__init__(pois)
+        self.docs = docs
+        self.adjustments = []
+        zen.set_hardware(self.HARDWARE_SETTING, self.CAMERA_SETTING)
+        self.marked_count = 0
+    def transform_point(self, x, y):
+        return (x,y)
+    def drive(self, poi, count, total_count):
+        (x,y) = self.transform_point(poi.x, poi.y)
+        self.docs.drive_to_xyz(x,y)
+    def stage_position(self):
+        (x,y,z) = self.docs.stage_position()
+        return (x,y)
+    def do_adjust(self, poi):
+        (x,y) = self.stage_position()
+        self.adjustments.append((x, y, poi.x, poi.y))
+    def close(self):
+        if 1 &lt; len(self.adjustments):
+            self.set_matrix_function(linear.get_transformation(self.adjustments))
+        super(AdjustMatrixForm, self).close()
+
+class AdjustMicaMatrixForm(AdjustMatrixForm):
+    def __init__(self, pois, docs, set_matrix_function):
+        super(AdjustMicaMatrixForm, self).__init__(pois, docs)
+        self.matrix_table = docs.matrix_table
+        self.matrix = linear.table_to_matrix(self.matrix_table)
+        self.set_matrix_function = set_matrix_function
+        self.docs = docs
+    def transform_point(self, x, y):
+        return linear.transform(self.matrix, x, y)
+    def drive(self, poi, count, total_count):
+        self.docs.drive_to_poi(poi)
+        grain = Zen.Acquisition.AcquireImage(False)
+        self.mirror_grain = Zen.Processing.Transformation.Geometric.Mirror(
+            grain,
+            ZenMirrorMode.FlipHorizontal,
+            ZenThirdProcessingDimension.None,
+            False
+        )
+        Zen.Application.Documents.Add(self.mirror_grain)
+        zen.show_live()
+        super(AdjustMicaMatrixForm, self).drive(poi, count, total_count)
+    def undrive(self, poi):
+        self.mirror_grain.Close()
+        self.mirror_grain = None
+    def do_mark(self, poi):
+        poi.name = '# Unsuitable'
+        self.marked_count += 1
+    def unmark_all(self):
+        self.marked_count = 0
+    def close(self):
+        if 0 &lt; self.marked_count:
+            self.docs.save_poi()
+        super(AdjustForm, self).close()
+
+class ReRegisterPointsForm(AdjustMatrixForm):
+    MARK = None
+    def __init__(self, pois, docs, set_matrix_function):
+        super(ReRegisterPointsForm, self).__init__(pois, docs)
+        self.matrix = docs.current_matrix
+        self.set_matrix_function = set_matrix_function
+    def get_exit_action(self):
+        return self.EXIT_KEEP
+    def drive(self, poi, count, total_count):
+        self.docs.drive_to_poi(poi)
+    def stage_position(self):
+        return (
+            Zen.Devices.Stage.ActualPositionX,
+            Zen.Devices.Stage.ActualPositionY
+        )
+    def transform_point(self, x, y):
+        if not self.matrix:
+            return (x,y)
+        return linear.transform(self.matrix, x, y)
+    def do_mark(self):
+        pass
+
+class AddPointForm(SelectForm):
+    NO = 'No, stop adding points'
+    def __init__(self, docs):
+        super(AddPointForm, self).__init__(
+            self.TITLE,
+            self.LABEL,
+            [self.YES, self.NO]
+        )
+        self.count = docs.poi.RowCount
+        self.docs = docs
+    def action(self):
+        self.count += 1
+        Zen.Application.Pause('Find a new point ({0})'.format(self.count))
+        return self.result() == self.YES
+    def run(self):
+        zen.show_live()
+        self.show()
+        while self.action():
+            (x,y,z) = self.docs.stage_position()
+            self.docs.poi.Rows.Add(self.TYPE, x, y, z, '')
+        return self.count
+    def __enter__(self):
+        return self
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
+class AddPoiForm(AddPointForm):
+    TITLE = 'Add new POIs'
+    LABEL = 'Should we add a new POI at this location?'
+    YES = 'Yes, add this location as a new POI'
+    TYPE = 'i'
+
+class AddRegistrationPointsForm(AddPointForm):
+    TITLE = 'Add new registration points'
+    LABEL = 'Should we add a new registration point at this location?'
+    YES = 'Yes, add this location as a new point'
+    TYPE = 'r'
+
+class AddMineralExtentsForm(AddPointForm):
+    TITLE = 'Add new minerals extents'
+    LABEL = 'Should we add this point to the mineral extents?'
+    YES = 'Yes, add this location as a new mineral extent'
+    TYPE = 'x'
+
+class AddMicaExtentsForm(AddPointForm):
+    TITLE = 'Add new mica extents'
+    LABEL = 'Should we add this point to the mica extents?'
+    YES = 'Yes, add this location as a new mica extent'
+    TYPE = 'm'
+
+def has_at_least(seq, n):
+    for s in seq:
+        n -= 1
+        if n &lt;= 0:
+            return True
+    return False
+
+class Task(object):
+    def __init__(self, docs):
+        self.docs = docs
+    def name(self):
+        raise UnsupportedException()
+    def is_available(self):
+        return True
+    def recommended(self):
+        return False
+    def do(self):
+        raise UnsupportedException()
+
+class PointTask(Task):
+    SAVE_MESSAGE = 'Save changes to points?'
+    def do(self):
+        count = self.adjust_points()
+        if count == 0:
+            return
+        window = Zen.Windows.CreateWindow(self.SAVE_MESSAGE)
+        window.HasCancelButton = True
+        if not window.Show().HasCanceled:
+            self.docs.save_poi()
+
+class AddPointsTask(PointTask):
+    MIN_POINTS = 1
+    IGNORE_DONE = True
+    IGNORE_UNSUITABLE = True
+    FORM = AddPoiForm
+    def adjust_points(self):
+        with self.FORM(self.docs) as form:
+            return form.run()
+    def recommended(self):
+        pois = self.docs.get_pois(self.FORM.TYPE, self.IGNORE_UNSUITABLE, self.IGNORE_DONE)
+        return not has_at_least(pois, self.MIN_POINTS)
+
+class AdjustPointsTask(PointTask):
+    IGNORE_UNSUITABLE = True
+    IGNORE_DONE = True
+    def get_pois(self):
+        return self.docs.get_pois(self.POI_TYPE, self.IGNORE_UNSUITABLE, self.IGNORE_DONE)
+    def is_available(self):
+        return has_at_least(self.get_pois(), 1)
+    def adjust_points(self):
+        with AdjustPoiForm(self.get_pois(), self.docs) as form:
+            return form.run()
+
+class AddPoisTask(AddPointsTask):
+    SAVE_MESSAGE = 'Save new POIs?'
+    def name(self):
+        return 'Add POIs'
+    def recommended(self):
+        # Manimal should usually be used, not this task
+        return False
+
+class AdjustPoisTask(AdjustPointsTask):
+    SAVE_MESSAGE = 'Save changes to POIs?'
+    POI_TYPE = 'i'
+    def name(self):
+        return 'Adjust existing POIs'
+
+class AddRegistrationPointsTask(AddPointsTask):
+    MIN_POINTS = 2
+    SAVE_MESSAGE = 'Save new registration points?'
+    FORM = AddRegistrationPointsForm
+    def name(self):
+        return 'Add registration points'
+
+class AdjustRegistrationPointsTask(AdjustPointsTask):
+    SAVE_MESSAGE = 'Save changes to registration points (does not re-register the slide)?'
+    POI_TYPE = 'r'
+    def name(self):
+        return 'Adjust registration points'
+
+class AddMineralExtentsTask(AddPointsTask):
+    MIN_POINTS = 2
+    SAVE_MESSAGE = 'Save new mineral extents?'
+    FORM = AddMineralExtentsForm
+    def name(self):
+        return 'Add mineral extents'
+
+class AdjustMineralExtentsTask(AdjustPointsTask):
+    SAVE_MESSAGE = 'Save changes to mineral extents?'
+    POI_TYPE = 'x'
+    def name(self):
+        return 'Adjust existing mineral extents'
+
+class AddMicaExtentsTask(AddPointsTask):
+    MIN_POINTS = 2
+    SAVE_MESSAGE = 'Save new mica extents?'
+    FORM = AddMicaExtentsForm
+    def name(self):
+        return 'Add mica extents'
+
+class AdjustMicaExtentsTask(AdjustPointsTask):
+    SAVE_MESSAGE = 'Save changes to mica extents?'
+    POI_TYPE = 'm'
+    def name(self):
+        return 'Adjust existing mica extents'
+
+def current_magnification():
+    return Zen.Devices.ObjectiveChanger.GetMagnificationByPosition(Zen.Devices.ObjectiveChanger.ActualPosition)
+
+def request_magnification(mag):
+    if current_magnification() != mag:
+        Zen.Application.Pause('Please set the magnification to {0}x'.format(mag))
+
+class CreateTiledImageTask(Task):
+    REG_SIZE = 50
+    MAGNIFICATION = 10
+    def get_pois(self):
+        return self.docs.get_pois(self.POI_TYPE)
+    def is_available(self):
+        return has_at_least(self.get_pois(), 2)
+    def extra_points(self):
+        return []
+    def do(self):
+        request_magnification(self.MAGNIFICATION)
+        ps = list(self.get_pois())
+        xmin = ps[0].x
+        xmax = xmin
+        ymin = ps[0].y
+        ymax = ymin
+        z = ps[0].z
+        for p in ps[1:]:
+            x = p.x
+            if x &lt; xmin:
+                xmin = x
+            elif xmax &lt; x:
+                xmax = x
+            y = p.y
+            if y &lt; ymin:
+                ymin = y
+            elif ymax &lt; y:
+                ymax = y
+            z += p.z
+        w = xmax - xmin
+        h = ymax - ymin
+        z = z / len(ps)
+        exp = Zen.Acquisition.Experiments.GetByName(self.EXPERIMENT_NAME)
+        exp.ClearTileRegionsAndPositions(0)
+        exp.AddRectangleTileRegion(0, xmin + w/2, ymin + h/2, w, h, z)
+        for p in self.extra_points():
+            exp.AddRectangleTileRegion(0, p.x, p.y, self.REG_SIZE, self.REG_SIZE, p.z)
+        tiles = Zen.Acquisition.Execute(exp)
+        zen.save_as(
+            tiles,
+            os.path.join(self.docs.folder, self.FILE_NAME),
+            True
+        )
+        tiles.Close()
+        exp.ClearTileRegionsAndPositions(0)
+        zen.discard_changes(exp)
+
+class CreateMineralImageTask(CreateTiledImageTask):
+    POI_TYPE = 'x'
+    EXPERIMENT_NAME = 'AcquireStacksTileCPol.czexp'
+    FILE_NAME = 'minerals.czi'
+    def name(self):
+        return 'Generate minerals tiled image'
+    def recommended(self):
+        return not self.docs.has_minerals
+    def extra_points(self):
+        return self.docs.get_pois('r')
+
+class CreateMicaImageTask(CreateTiledImageTask):
+    POI_TYPE = 'm'
+    EXPERIMENT_NAME = 'AcquireStacksTileTL.czexp'
+    FILE_NAME = 'mica.czi'
+    def name(self):
+        return 'Generate mica tiled image'
+    def recommended(self):
+        return not self.docs.has_mica
+
+class RegistrationTask(Task):
+    SAVE_MESSAGE = 'Reregister?'
+    def set_matrix(self, matrix):
+        raise UnsupportedException()
+    def ask_to_set_matrix(self, matrix):
+        window = Zen.Windows.CreateWindow(self.SAVE_MESSAGE)
+        window.HasCancelButton = True
+        if not window.Show().HasCanceled:
+            self.set_matrix(matrix)
+
+class AdjustMicaMatrixTask(RegistrationTask):
+    SAVE_MESSAGE = 'Save changes to mica transformation?'
+    def name(self):
+        return 'Fine tune mica transformation'
+    def get_pois(self):
+        return self.docs.get_pois('i')
+    def is_available(self):
+        return has_at_least(self.get_pois(), 2) and self.docs.matrix
+    def do(self):
+        with AdjustMicaMatrixForm(self.get_pois(), self.docs, self.ask_to_set_matrix) as form:
+            form.run()
+    def set_matrix(self, matrix):
+        mt = self.docs.matrix_table
+        for r in range(2):
+            for c in range(3):
+                mt.SetValue(r, c, matrix[r][c])
+        self.docs.save_matrix()
+
+class ReRegisterPointsTask(RegistrationTask):
+    SAVE_MESSAGE = 'Save this registration?'
+    def name(self):
+        return 'Re-register (after stage recalibration or removal)'
+    def get_pois(self):
+        return self.docs.get_pois('r')
+    def is_available(self):
+        return has_at_least(self.get_pois(), 2)
+    def do(self):
+        with ReRegisterPointsForm(self.get_pois(), self.docs, self.ask_to_set_matrix) as form:
+            form.run()
+    def set_matrix(self, matrix):
+        mt = self.docs.get_current_matrix_table()
+        for r in range(2):
+            for c in range(3):
+                mt.SetValue(r, c, matrix[r][c])
+        self.docs.save_current_matrix()
+
+class ResetRegistrationTask(RegistrationTask):
+    SAVE_MESSAGE = 'Move all points to new registration (and delete old tiled images)?'
+    def name(self):
+        return 'Reset registration: move points and delete tiles images'
+    def get_pois(self):
+        return self.docs.get_pois('r')
+    def is_available(self):
+        return has_at_least(self.get_pois(), 2)
+    def do(self):
+        with ReRegisterPointsForm(self.get_pois(), self.docs, self.ask_to_set_matrix) as form:
+            form.run()
+    def set_matrix(self, matrix):
+        for p in self.docs.all_pois():
+            (x, y) = linear.transform(matrix, p.x, p.y)
+            p.x = x
+            p.y = y
+        self.docs.save_poi()
+        self.docs.delete_minerals()
+        self.docs.delete_mica()
+        self.docs.delete_current_matrix()
+
+class GetMicaMatrixTask(Task):
+    def name(self):
+        return 'Get mica transformation matrix (with Manimal)'
+    def is_available(self):
+        return self.docs.has_minerals and self.docs.has_mica
+    def recommended(self):
+        return not self.docs.matrix
+    def do(self):
+        proc = subprocess.Popen([
+            'python',
+            '-m',
+            'manimal',
+            '-m',
+            'matrix.csv',
+            '-f',
+            'minerals.czi',
+            '-a',
+            'mica.czi'
+        ], cwd=self.docs.folder)
+        proc.wait()
+
+class ManimalPoiTask(Task):
+    def name(self):
+        return 'Add/adjust POIs and registration points (with Manimal)'
+    def is_available(self):
+        return self.docs.has_minerals
+    def recommended(self):
+        # if we have already started getting Z-stacks, we're probably
+        # past the adding and adjusting stage
+        for poi in self.docs.get_pois(ignore_done=False):
+            if poi.name:
+                return False
+        return True
+    def do(self):
+        proc = subprocess.Popen([
+            'python',
+            '-m',
+            'manimal',
+            '-p',
+            'poi.csv',
+            '-f',
+            'minerals.czi',
+        ], cwd=self.docs.folder)
+        proc.wait()
+
+def acquire_stack(parameters, folder, prefix=''):
+    rl_slice_count = parameters['refl_slice_count']
+    rl_interval = parameters['refl_interval']
+    tl_slice_count = parameters['slice_count']
+    tl_interval = parameters['trans_interval']
+    focus = Zen.Devices.Focus.ActualPosition
+    zen.set_hardware(camera_setting=camera_setting)
+    zen.set_hardware(hs_reflected, camera_setting)
+    for i in range(rl_slice_count):
+        Zen.Devices.Focus.MoveTo(focus + i * rl_interval)
+        im = Zen.Acquisition.AcquireImage()
+        im.Save(os.path.join(folder, "{1}ReflStack-{0:02d}.jpg".format(i, prefix)), 80)
+    zen.set_hardware(hs_transmitted, camera_setting)
+    for i in range(0, tl_slice_count):
+        Zen.Devices.Focus.MoveTo(focus + i * tl_interval)
+        im = Zen.Acquisition.AcquireImage()
+        im.Save(os.path.join(folder, "{1}Stack-{0:02d}.jpg".format(i, prefix)), 80)
+    Zen.Devices.Focus.MoveTo(focus)
+
+def get_parameters(tl_interval, tl_slice_count, refl_interval, refl_slice_count):
+    window = Zen.Windows.CreateWindow('Acquire image stacks')
+    window.AddDoubleRange('trans_interval', 'Focus interval (transmitted light, microns)', tl_interval, 0.1, 2.0)
+    window.AddIntegerRange('slice_count', 'Slices in Z-stack (transmitted light)', tl_slice_count, 0, 30)
+    window.AddDoubleRange('refl_interval', 'Focus interval (reflected light, microns)', refl_interval, 0.1, 2.0)
+    window.AddIntegerRange('refl_slice_count', 'Slices in Z-stack (reflected light)', refl_slice_count, 0, 10)
+    window.AddTextBlock('Please select the 50x objective, slide the condensor in and set the transmitted light filters to 6,100')
+    result = window.Show()
+    if result.HasCanceled:
+        return None
+    r = {}
+    for k in [
+        'trans_interval',
+        'slice_count',
+        'refl_interval',
+        'refl_slice_count'
+    ]:
+        r[k] = result.GetValue(k)
+    return r
+
+class CaptureZStacksTask(Task):
+    FILE_PREFIX = ''
+    def poi_is_ok(self, poi):
+        return True
+    def get_pois(self):
+        return [
+            p
+            for p in self.docs.get_pois('i', ignore_done=False)
+            if self.poi_is_ok(p)
+        ]
+    def is_available(self):
+        return has_at_least(self.get_pois(), 1)
+    def recommended(self):
+        return True
+    def focus(self, z):
+        zen.autofocus(coarse_focus_experiment_name)
+        zen.autofocus(rl_experiment_name)
+        return z
+    def drive_to(self, poi):
+        self.docs.drive_to_poi(poi)
+    def get_folder(self, poi):
+        raise UnsupportedException()
+    def set_folder(self, poi, folder):
+        pass
+    def preprocess_pois(self, pois):
+        pass
+    def do(self):
+        parameters = get_parameters(0.3, 17, 1.0, 3)
+        if not parameters:
+            return
+        request_magnification(50)
+        c = 0
+        pois = list(self.get_pois())
+        self.preprocess_pois(pois)
+        for poi in pois:
+            self.drive_to(poi)
+            c += 1
+            print('capturing {0} out of {1} POIs (row {2}) at {3}'.format(
+                c, len(pois), poi.table_row + 1, time.strftime('%H:%M:%S', time.localtime())
+            ))
+            try:
+                grain_folder = self.get_folder(poi)
+                if grain_folder:
+                    self.focus(Zen.Devices.Focus.ActualPosition)
+                    acquire_stack(parameters, grain_folder, self.FILE_PREFIX)
+                    self.docs.save_current_matrix_as(os.path.join(
+                        grain_folder, self.REGISTRATION_MATRIX_FILE_NAME
+                    ))
+                    self.set_folder(poi, grain_folder)
+            except Exception as e:
+                print e
+                print type(e)
+
+class CaptureMineralZStacksTask(CaptureZStacksTask):
+    REGISTRATION_MATRIX_FILE_NAME = 'mineral_matrix.csv'
+    def name(self):
+        return 'Capture Mineral Z-Stacks'
+    def poi_is_ok(self, poi):
+        if not poi.name:
+            return True
+        if poi.name[0] == '#':
+            return False
+        mineral = os.path.join(poi.name, 'Stack-00.jpg')
+        return not os.path.exists(mineral)
+    def get_folder(self, poi):
+        return self.docs.get_next_grain_folder()
+    def set_folder(self, poi, folder):
+        poi.name = folder
+        self.docs.save_poi()
+    def preprocess_pois(self, pois):
+        """
+        Remove all the existing folder names, otherwise we might confuse ourselves
+        by putting the z-stack for one poi in the name another poi already thinks
+        it owns.
+        """
+        for poi in pois:
+            poi.name = ''
+
+class CaptureMicaZStacksTask(CaptureZStacksTask):
+    REGISTRATION_MATRIX_FILE_NAME = 'mica_matrix.csv'
+    FILE_PREFIX = 'Mica'
+    def __init__(self, docs):
+        super(CaptureMicaZStacksTask, self).__init__(docs)
+        self.current_focus = None
+    def name(self):
+        return 'Capture Mica Z-Stacks for existing Mineral Z-Stacks'
+    def poi_is_ok(self, poi):
+        if poi.name and poi.name[0] != '#':
+            mineral = os.path.join(poi.name, 'Stack-00.jpg')
+            mica = os.path.join(poi.name, 'MicaStack-00.jpg')
+            if os.path.exists(mineral) and not os.path.exists(mica):
+                return True
+        return False
+    def focus(self, z):
+        if self.current_focus:
+            Zen.Devices.Focus.MoveTo(self.current_focus)
+        else:
+            Zen.Devices.Focus.MoveTo(z)
+            zen.autofocus(tl_coarse_focus_experiment_name)
+        zen.autofocus(rl_experiment_name)
+        self.current_focus = Zen.Devices.Focus.ActualPosition
+        return self.current_focus
+    def drive_to(self, poi):
+        self.docs.drive_to_poi_mica(poi)
+    def get_folder(self, poi):
+        return poi.name
+
+def get_project_folder():
+    window = Zen.Windows.CreateWindow('Choose folder to work in')
+    documents_folder = Zen.Application.Environment.GetFolderPath(ZenSpecialFolder.Documents)
+    folder = os.path.join(documents_folder, 'GeochronAtHome')
+    window.AddFolderBrowser('folder','Output folder', folder)
+    result = zen.show_window(window)
+    return result.GetValue('folder')
+
+def run_a_task(folder):
+    docs = Documents(folder)
+    task_classes = [
+        AddRegistrationPointsTask,
+        AdjustRegistrationPointsTask,
+        AddPoisTask,
+        AdjustPoisTask,
+        AddMineralExtentsTask,
+        AdjustMineralExtentsTask,
+        AddMicaExtentsTask,
+        AdjustMicaExtentsTask,
+        CreateMineralImageTask,
+        CreateMicaImageTask,
+        AdjustMicaMatrixTask,
+        ReRegisterPointsTask,
+        ResetRegistrationTask,
+        GetMicaMatrixTask,
+        ManimalPoiTask,
+        CaptureMineralZStacksTask,
+        CaptureMicaZStacksTask,
+    ]
+    tasks = {}
+    dones = []
+    news = []
+    for t in [ tc(docs) for tc in task_classes ]:
+        if t.is_available():
+            name = t.name()
+            if t.recommended():
+                name = '* ' + name
+                tasks[name] = t
+                news.append(name)
+            else:
+                tasks[name] = t
+                dones.append(name)
+    window = Zen.Windows.CreateWindow('Choose a task')
+    window.AddDropDown('task', 'Task', news + dones, 0)
+    r = window.Show()
+    if r.HasCanceled:
+        return False
+    tasks[r.GetValue('task')].do()
+    return True
+
+folder = get_project_folder()
+while run_a_task(folder):
+    pass
+</Text>
+  <Author></Author>
+  <Description></Description>
+  <Keywords></Keywords>
+  <Row>761</Row>
+  <Column>58</Column>
+</Script>

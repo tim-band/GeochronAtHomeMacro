@@ -1,0 +1,21 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<HardwareSetting Name="AcquireStacksPolarized.czhws">
+  <ParameterCollection Id="MTBReflectorChanger">
+    <PositionName Status="Valid" IsActivated="true">Reflector.424937-9901-000</PositionName>
+    <Position Status="Valid" IsActivated="true">3</Position>
+  </ParameterCollection>
+  <ParameterCollection Id="MTBRLShutter">
+    <IsClosed Status="Valid" IsActivated="true">true</IsClosed>
+  </ParameterCollection>
+  <ParameterCollection Id="MTBTLHalogenLamp">
+    <LampMode Status="Valid" IsActivated="true">Manual</LampMode>
+    <Intensity Status="Valid" IsActivated="true">33.333333333333</Intensity>
+  </ParameterCollection>
+  <ParameterCollection Id="MTBRLTLSwitch">
+    <PositionName Status="Valid" IsActivated="true">RLTLSwitch.TL</PositionName>
+    <Position Status="Valid" IsActivated="true">1</Position>
+  </ParameterCollection>
+  <ParameterCollection Id="MTBRLHalogenLamp">
+    <Intensity Status="Valid" IsActivated="true">0</Intensity>
+  </ParameterCollection>
+</HardwareSetting>

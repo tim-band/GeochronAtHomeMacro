@@ -1,0 +1,35 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<HardwareSetting Name="AcquireStacksReflected.czhws">
+  <ParameterCollection Id="MTBRLHalogenLamp">
+    <LampMode Status="Valid" IsActivated="true">Manual</LampMode>
+    <Intensity Status="Valid" IsActivated="true">69.298245614035</Intensity>
+  </ParameterCollection>
+  <ParameterCollection Id="MTBRLShutter">
+    <IsClosed Status="Valid" IsActivated="true">false</IsClosed>
+  </ParameterCollection>
+  <ParameterCollection Id="MTBRLApertureStop">
+    <Position Status="Valid" IsActivated="true" Unit="%">33.0550918197</Position>
+  </ParameterCollection>
+  <ParameterCollection Id="MTBTLHalogenLamp">
+    <LampMode Status="Valid" IsActivated="true">Standby</LampMode>
+    <Intensity Status="Valid" IsActivated="true">0</Intensity>
+  </ParameterCollection>
+  <ParameterCollection Id="MTBRLFieldStop">
+    <Position Status="Valid" IsActivated="true" Unit="%">85.396383866481</Position>
+  </ParameterCollection>
+  <ParameterCollection Id="MTBRLTLSwitch">
+    <PositionName Status="Valid" IsActivated="true">RLTLSwitch.RL</PositionName>
+  </ParameterCollection>
+  <ParameterCollection Id="MTBReflectorChanger">
+    <PositionName Status="Valid" IsActivated="true">Reflector.424928-9901-000</PositionName>
+    <Position Status="Valid" IsActivated="true">1</Position>
+  </ParameterCollection>
+  <ParameterCollection Id="MTBRLFilterChanger1">
+    <PositionName Status="Valid" IsActivated="true">ND 6</PositionName>
+    <Position Status="Valid" IsActivated="true">2</Position>
+  </ParameterCollection>
+  <ParameterCollection Id="MTBRLFilterChanger2">
+    <PositionName Status="Valid" IsActivated="true">ND 100</PositionName>
+    <Position Status="Valid" IsActivated="true">1</Position>
+  </ParameterCollection>
+</HardwareSetting>
