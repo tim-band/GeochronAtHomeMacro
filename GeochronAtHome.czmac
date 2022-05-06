@@ -74,11 +74,15 @@ class SelectForm(Form):
         self.Controls.Add(self.layout)
         self.label = Label()
         self.label.Text = label
+        self.label.Width = 140
+        self.label.Height = 80
+        #self.label.AutoSize = True
         self.layout.Controls.Add(self.label, 0, 0)
         self.combo = ListBox()
         for s in options:
             self.combo.Items.Add(s)
         self.combo.SetSelected(0, True)
+        self.combo.AutoSize = True
         self.layout.Controls.Add(self.combo, 1, 0)
         self.TopMost = True
     def show(self):
@@ -89,22 +93,28 @@ class SelectForm(Form):
         self.Close()
         self.Dispose()
 
+def removeNones(array):
+    return [x for x in array if x]
+
 class AdjustForm(SelectForm):
     OK = 'set to current position and focus'
     LEAVE = 'leave as it is'
     MARK = 'mark as unsuitable'
     EXIT = 'exit task'
+    CHANGE = None
     EXIT_CANCEL = "don't exit, carry on adjusting!"
     EXIT_KEEP = 'exit, leaving remaining POIs as they are'
-    EXIT_UNSUITABLE = 'exit and mark remaining POIs as unsuitable'
+    EXIT_MARK_ALL = 'exit and mark remaining POIs as unsuitable'
     EXIT_KEEP_ALL = 'exit, keeping all points'
     TITLE = 'Choose what should happen to this POI'
     LABEL = 'What should we do with this POI?'
+    def get_prompt(self, count, total):
+        return 'Adjust position and focus ({0} of {1})'.format(count, total)
     def __init__(self, objects):
         super(AdjustForm, self).__init__(
             self.TITLE,
             self.LABEL,
-            [x for x in [self.OK, self.LEAVE, self.MARK, self.EXIT] if x]
+            removeNones([self.OK, self.LEAVE, self.MARK, self.EXIT, self.CHANGE])
         )
         self.objects = list(objects)
         self.total_count = len(self.objects)
@@ -117,7 +127,7 @@ class AdjustForm(SelectForm):
         window.AddDropDown(
             action,
             'What now?',
-            [self.EXIT_CANCEL, self.EXIT_KEEP, self.EXIT_UNSUITABLE, self.EXIT_KEEP_ALL],
+            removeNones([self.EXIT_CANCEL, self.EXIT_KEEP, self.EXIT_MARK_ALL, self.EXIT_KEEP_ALL]),
             0
         )
         result = zen.show_window(window)
@@ -125,15 +135,12 @@ class AdjustForm(SelectForm):
     def try_update_adjust_action(self):
         if self.exiting:
             return True
-        Zen.Application.Pause('Adjust position and focus ({0} of {1})'.format(
-            self.count,
-            self.total_count
-        ))
+        Zen.Application.Pause(self.get_prompt(self.count, self.total_count))
         self.action = self.result()
         if self.action != self.EXIT:
             return True
         exit_action = self.get_exit_action()
-        if exit_action == self.EXIT_UNSUITABLE:
+        if exit_action == self.EXIT_MARK_ALL:
             self.exiting = True
             self.action = self.MARK
             return True
@@ -150,7 +157,6 @@ class AdjustForm(SelectForm):
         Ask for the action repeatedly until the user stops saying "exit, keep editing"
         """
         self.show()
-        self.count += 1
         while not self.try_update_adjust_action():
             pass
     def drive(self, o, count, total_count):
@@ -163,6 +169,14 @@ class AdjustForm(SelectForm):
         pass
     def undrive(self, o):
         pass
+    def change(self, o, count, total_count):
+        pass
+    def action_for_one_point(self, o):
+        self.count += 1
+        self.update_adjust_action()
+        while self.action == self.CHANGE:
+            self.change(o, self.count, self.total_count)
+            self.update_adjust_action()
     def run(self):
         zen.show_live()
         count = 0
@@ -171,7 +185,7 @@ class AdjustForm(SelectForm):
             if not self.exiting:
                 self.drive(o, self.count, self.total_count)
                 driven = True
-            self.update_adjust_action()
+            self.action_for_one_point(o)
             if self.action == self.OK:
                 self.do_adjust(o)
                 count += 1
@@ -225,6 +239,15 @@ class Poi(object):
     def name(self, value):
         self.table.SetValue(self.row, 4, value)
 
+def suitable_and_not_done(is_unsuitable, is_done):
+    return not is_unsuitable and not is_done
+
+def suitable(is_unsuitable, is_done):
+    return not is_unsuitable
+
+def unsuitable(is_unsuitable, is_done):
+    return is_unsuitable
+
 class Documents(object):
     def load(self, filename):
         """ Load a csv file as a table """
@@ -275,19 +298,14 @@ class Documents(object):
         self.current_matrix_table = m
         self.current_matrix = linear.table_to_matrix(m)
         return m
-    def get_pois(self, type='i', ignore_unsuitable=True, ignore_done=True):
+    def get_pois(self, type='i', suitability_function=suitable_and_not_done):
         for i in range(self.poi.RowCount):
             t = self.poi.GetValue(i,0)
             name = self.poi.GetValue(i,4)
             is_blank = name == ''
             is_unsuitable = not is_blank and name[0] == '#'
             is_done = not is_blank and not is_unsuitable and os.path.exists(name)
-            ok = True
-            if is_unsuitable and ignore_unsuitable:
-                ok = False
-            if is_done and ignore_done:
-                ok = False
-            if t == type and ok:
+            if t == type and suitability_function(is_unsuitable, is_done):
                 yield Poi(self.poi, i)
     def all_pois(self):
         for i in range(self.poi.RowCount):
@@ -356,7 +374,7 @@ class AdjustMatrixForm(AdjustForm):
     MARK = 'mark this POI as unsuitable'
     EXIT = 'exit task'
     EXIT_KEEP = 'exit, ignoring remaining points'
-    EXIT_UNSUITABLE = 'exit and mark remaining POIs as unsuitable'
+    EXIT_MARK_ALL = 'exit and mark remaining POIs as unsuitable'
     HARDWARE_SETTING = hs_transmitted
     CAMERA_SETTING = camera_setting
     def __init__(self, pois, docs):
@@ -413,7 +431,7 @@ class AdjustMicaMatrixForm(AdjustMatrixForm):
     def close(self):
         if 0 &lt; self.marked_count:
             self.docs.save_poi()
-        super(AdjustForm, self).close()
+        super(AdjustMicaMatrixForm, self).close()
 
 class ReRegisterPointsForm(AdjustMatrixForm):
     MARK = None
@@ -435,7 +453,7 @@ class ReRegisterPointsForm(AdjustMatrixForm):
             return (x,y)
         return linear.transform(self.matrix, x, y)
     def do_mark(self):
-        pass
+        raise UnsupportedException()
 
 class AddPointForm(SelectForm):
     NO = 'No, stop adding points'
@@ -487,6 +505,53 @@ class AddMicaExtentsForm(AddPointForm):
     YES = 'Yes, add this location as a new mica extent'
     TYPE = 'm'
 
+class ResurrectUnsuitableForm(AdjustForm):
+    OK = None
+    LEAVE = 'leave as unsuitable'
+    MARK = 'resurrect as suitable'
+    CHANGE = None
+    EXIT_CANCEL = "don't exit, carry on unmarking!"
+    EXIT_KEEP = 'exit, leaving remaining POIs as they are'
+    EXIT_MARK_ALL = 'exit and resurrect remaining POIs as suitable'
+    EXIT_KEEP_ALL = 'exit, leaving all points as they were'
+    TITLE = 'Choose what should happen to this POI'
+    LABEL = 'What should we do with this POI?'
+    def __init__(self, pois, docs):
+        super(ResurrectUnsuitableForm, self).__init__(pois)
+        self.docs = docs
+        self.unmarked_count = 0
+    def get_prompt(self, count, total):
+        return 'Resurrect point? ({0} of {1})'.format(count, total)
+    def drive(self, o, count, total_count):
+        self.docs.drive_to_poi(o)
+    def do_adjust(self, o):
+        raise UnsupportedException()
+    def do_mark(self, poi):
+        poi.name = ''
+        self.unmarked_count += 1
+    def unmark_all(self):
+        self.unmarked_count = 0
+    def close(self):
+        if 0 &lt; self.unmarked_count:
+            self.docs.save_poi()
+        super(ResurrectUnsuitableForm, self).close()
+
+class ResurrectUnsuitableWithMicaForm(ResurrectUnsuitableForm):
+    CHANGE = 'swap mineral/mica'
+    def do_drive(self, o, at_mica, count, total_count):
+        if at_mica:
+            self.docs.drive_to_poi_mica(o)
+        else:
+            self.docs.drive_to_poi(o)
+    def drive(self, o, count, total_count):
+        self.at_mica = False
+        self.current = o
+        self.count
+        self.do_drive(o, self.at_mica, count, total_count)
+    def change(self, o, count, total_count):
+        self.at_mica = not self.at_mica
+        self.do_drive(o, self.at_mica, count, total_count)
+
 def has_at_least(seq, n):
     for s in seq:
         n -= 1
@@ -506,6 +571,12 @@ class Task(object):
     def do(self):
         raise UnsupportedException()
 
+class RefreshTask(object):
+    def name(self):
+        return 'Refresh task list'
+    def do(self):
+        pass
+
 class PointTask(Task):
     SAVE_MESSAGE = 'Save changes to points?'
     def do(self):
@@ -519,21 +590,17 @@ class PointTask(Task):
 
 class AddPointsTask(PointTask):
     MIN_POINTS = 1
-    IGNORE_DONE = True
-    IGNORE_UNSUITABLE = True
     FORM = AddPoiForm
     def adjust_points(self):
         with self.FORM(self.docs) as form:
             return form.run()
     def recommended(self):
-        pois = self.docs.get_pois(self.FORM.TYPE, self.IGNORE_UNSUITABLE, self.IGNORE_DONE)
+        pois = self.docs.get_pois(self.FORM.TYPE)
         return not has_at_least(pois, self.MIN_POINTS)
 
 class AdjustPointsTask(PointTask):
-    IGNORE_UNSUITABLE = True
-    IGNORE_DONE = True
     def get_pois(self):
-        return self.docs.get_pois(self.POI_TYPE, self.IGNORE_UNSUITABLE, self.IGNORE_DONE)
+        return self.docs.get_pois(self.POI_TYPE)
     def is_available(self):
         return has_at_least(self.get_pois(), 1)
     def adjust_points(self):
@@ -734,6 +801,38 @@ class ResetRegistrationTask(RegistrationTask):
         self.docs.delete_mica()
         self.docs.delete_current_matrix()
 
+class ResurrectUnsuitableTask(Task):
+    def name(self):
+        return 'Resurrect unsuitable POIs as suitable'
+    def get_pois(self):
+        return self.docs.get_pois('i', suitability_function=unsuitable)
+    def is_available(self):
+        return has_at_least(self.get_pois(), 1) and not self.docs.matrix
+    def do(self):
+        with ResurrectUnsuitableForm(self.get_pois(), self.docs) as form:
+            if form.run() == 0:
+                return
+        window = Zen.Windows.CreateWindow('Do you want to resurrect these points?')
+        window.HasCancelButton = True
+        if not window.Show().HasCanceled:
+            self.docs.save_poi()
+
+class ResurrectUnsuitableWithMicaTask(Task):
+    def name(self):
+        return 'Resurrect unsuitable POIs as suitable'
+    def get_pois(self):
+        return self.docs.get_pois('i', suitability_function=unsuitable)
+    def is_available(self):
+        return has_at_least(self.get_pois(), 1) and self.docs.matrix
+    def do(self):
+        with ResurrectUnsuitableWithMicaForm(self.get_pois(), self.docs) as form:
+            if form.run() == 0:
+                return
+        window = Zen.Windows.CreateWindow('Do you want to resurrect these points?')
+        window.HasCancelButton = True
+        if not window.Show().HasCanceled:
+            self.docs.save_poi()
+
 class GetMicaMatrixTask(Task):
     def name(self):
         return 'Get mica transformation matrix (with Manimal)'
@@ -763,7 +862,7 @@ class ManimalPoiTask(Task):
     def recommended(self):
         # if we have already started getting Z-stacks, we're probably
         # past the adding and adjusting stage
-        for poi in self.docs.get_pois(ignore_done=False):
+        for poi in self.docs.get_pois(suitability_function=suitable):
             if poi.name:
                 return False
         return True
@@ -804,7 +903,7 @@ def get_parameters(tl_interval, tl_slice_count, refl_interval, refl_slice_count)
     window.AddIntegerRange('slice_count', 'Slices in Z-stack (transmitted light)', tl_slice_count, 0, 30)
     window.AddDoubleRange('refl_interval', 'Focus interval (reflected light, microns)', refl_interval, 0.1, 2.0)
     window.AddIntegerRange('refl_slice_count', 'Slices in Z-stack (reflected light)', refl_slice_count, 0, 10)
-    window.AddTextBlock('Please select the 50x objective, slide the condensor in and set the transmitted light filters to 6,100')
+    window.AddTextBlock('Please select the 50x objective, set the condensor and set the transmitted light filters to 6,100')
     result = window.Show()
     if result.HasCanceled:
         return None
@@ -820,12 +919,13 @@ def get_parameters(tl_interval, tl_slice_count, refl_interval, refl_slice_count)
 
 class CaptureZStacksTask(Task):
     FILE_PREFIX = ''
+    MAX_FAILURES = 3
     def poi_is_ok(self, poi):
         return True
     def get_pois(self):
         return [
             p
-            for p in self.docs.get_pois('i', ignore_done=False)
+            for p in self.docs.get_pois('i', suitability_function=suitable)
             if self.poi_is_ok(p)
         ]
     def is_available(self):
@@ -850,6 +950,7 @@ class CaptureZStacksTask(Task):
             return
         request_magnification(50)
         c = 0
+        failures = 0
         pois = list(self.get_pois())
         self.preprocess_pois(pois)
         for poi in pois:
@@ -870,9 +971,13 @@ class CaptureZStacksTask(Task):
             except Exception as e:
                 print e
                 print type(e)
+                failures += 1
+                if failures == self.MAX_FAILURES:
+                    Zen.Application.Pause(self.FAILURE_MESSAGE)
 
 class CaptureMineralZStacksTask(CaptureZStacksTask):
     REGISTRATION_MATRIX_FILE_NAME = 'mineral_matrix.csv'
+    FAILURE_MESSAGE = 'Too many failures! Try running the Adjust existing POIs task'
     def name(self):
         return 'Capture Mineral Z-Stacks'
     def poi_is_ok(self, poi):
@@ -899,6 +1004,7 @@ class CaptureMineralZStacksTask(CaptureZStacksTask):
 class CaptureMicaZStacksTask(CaptureZStacksTask):
     REGISTRATION_MATRIX_FILE_NAME = 'mica_matrix.csv'
     FILE_PREFIX = 'Mica'
+    FAILURE_MESSAGE = 'Too many failures! Focus the microscope on the mica and try again'
     def __init__(self, docs):
         super(CaptureMicaZStacksTask, self).__init__(docs)
         self.current_focus = None
@@ -930,6 +1036,7 @@ def get_project_folder():
     documents_folder = Zen.Application.Environment.GetFolderPath(ZenSpecialFolder.Documents)
     folder = os.path.join(documents_folder, 'GeochronAtHome')
     window.AddFolderBrowser('folder','Output folder', folder)
+    window.FocusControl = 'folder'
     result = zen.show_window(window)
     return result.GetValue('folder')
 
@@ -949,10 +1056,13 @@ def run_a_task(folder):
         AdjustMicaMatrixTask,
         ReRegisterPointsTask,
         ResetRegistrationTask,
+        ResurrectUnsuitableTask,
+        ResurrectUnsuitableWithMicaTask,
         GetMicaMatrixTask,
         ManimalPoiTask,
         CaptureMineralZStacksTask,
         CaptureMicaZStacksTask,
+        RefreshTask,
     ]
     tasks = {}
     dones = []
@@ -982,6 +1092,6 @@ while run_a_task(folder):
   <Author></Author>
   <Description></Description>
   <Keywords></Keywords>
-  <Row>761</Row>
-  <Column>58</Column>
+  <Row>1060</Row>
+  <Column>21</Column>
 </Script>
