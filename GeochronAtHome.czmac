@@ -298,6 +298,10 @@ class Documents(object):
         self.current_matrix_table = m
         self.current_matrix = linear.table_to_matrix(m)
         return m
+    def maybe_current_matrix(self):
+        if not self.current_matrix_table:
+            return None
+        return 'current_reg_matrix.csv'
     def get_pois(self, type='i', suitability_function=suitable_and_not_done):
         for i in range(self.poi.RowCount):
             t = self.poi.GetValue(i,0)
@@ -328,6 +332,10 @@ class Documents(object):
         if self.current_matrix:
             (x,y) = linear.inv_transform(self.current_matrix, x, y)
         return (x, y, Zen.Devices.Focus.ActualPosition)
+    def stage_position_of_poi(self, p):
+        if self.current_matrix:
+            return linear.inv_transform(self.current_matrix, p.x, p.y)
+        return (p.x, p.y)
     def delete(self, filename):
         path = os.path.join(self.folder, filename)
         if not os.path.exists(path):
@@ -453,7 +461,7 @@ class ReRegisterPointsForm(AdjustMatrixForm):
             return (x,y)
         return linear.transform(self.matrix, x, y)
     def do_mark(self):
-        raise UnsupportedException()
+        raise NotImplementedError()
 
 class AddPointForm(SelectForm):
     NO = 'No, stop adding points'
@@ -525,7 +533,7 @@ class ResurrectUnsuitableForm(AdjustForm):
     def drive(self, o, count, total_count):
         self.docs.drive_to_poi(o)
     def do_adjust(self, o):
-        raise UnsupportedException()
+        raise NotImplementedError()
     def do_mark(self, poi):
         poi.name = ''
         self.unmarked_count += 1
@@ -563,15 +571,15 @@ class Task(object):
     def __init__(self, docs):
         self.docs = docs
     def name(self):
-        raise UnsupportedException()
+        raise NotImplementedError()
     def is_available(self):
         return True
     def recommended(self):
         return False
     def do(self):
-        raise UnsupportedException()
+        raise NotImplementedError()
 
-class RefreshTask(object):
+class RefreshTask(Task):
     def name(self):
         return 'Refresh task list'
     def do(self):
@@ -672,44 +680,42 @@ class CreateTiledImageTask(Task):
     MAGNIFICATION = 10
     def get_pois(self):
         return self.docs.get_pois(self.POI_TYPE)
+    def get_extents(self):
+        return [list(self.get_pois())]
     def is_available(self):
         return has_at_least(self.get_pois(), 2)
     def extra_points(self):
         return []
     def do(self):
         request_magnification(self.MAGNIFICATION)
-        ps = list(self.get_pois())
-        xmin = ps[0].x
-        xmax = xmin
-        ymin = ps[0].y
-        ymax = ymin
-        z = ps[0].z
-        for p in ps[1:]:
-            x = p.x
-            if x &lt; xmin:
-                xmin = x
-            elif xmax &lt; x:
-                xmax = x
-            y = p.y
-            if y &lt; ymin:
-                ymin = y
-            elif ymax &lt; y:
-                ymax = y
-            z += p.z
-        w = xmax - xmin
-        h = ymax - ymin
-        z = z / len(ps)
         exp = Zen.Acquisition.Experiments.GetByName(self.EXPERIMENT_NAME)
         exp.ClearTileRegionsAndPositions(0)
-        exp.AddRectangleTileRegion(0, xmin + w/2, ymin + h/2, w, h, z)
+        for ps in self.get_extents():
+            (xmin, ymin) = self.docs.stage_position_of_poi(ps[0])
+            xmax = xmin
+            ymax = ymin
+            z = ps[0].z
+            for p in ps[1:]:
+                (x, y) = self.docs.stage_position_of_poi(p)
+                if x &lt; xmin:
+                    xmin = x
+                elif xmax &lt; x:
+                    xmax = x
+                if y &lt; ymin:
+                    ymin = y
+                elif ymax &lt; y:
+                    ymax = y
+                z += p.z
+            w = xmax - xmin
+            h = ymax - ymin
+            z = z / len(ps)
+            exp.AddRectangleTileRegion(0, xmin + w/2, ymin + h/2, w, h, z)
         for p in self.extra_points():
-            exp.AddRectangleTileRegion(0, p.x, p.y, self.REG_SIZE, self.REG_SIZE, p.z)
+            (x, y) = self.docs.stage_position_of_poi(p)
+            exp.AddRectangleTileRegion(0, x, y, self.REG_SIZE, self.REG_SIZE, p.z)
         tiles = Zen.Acquisition.Execute(exp)
-        zen.save_as(
-            tiles,
-            os.path.join(self.docs.folder, self.FILE_NAME),
-            True
-        )
+        path = os.path.join(self.docs.folder, self.FILE_NAME)
+        zen.save_as(tiles, path, True)
         tiles.Close()
         exp.ClearTileRegionsAndPositions(0)
         zen.discard_changes(exp)
@@ -737,7 +743,7 @@ class CreateMicaImageTask(CreateTiledImageTask):
 class RegistrationTask(Task):
     SAVE_MESSAGE = 'Reregister?'
     def set_matrix(self, matrix):
-        raise UnsupportedException()
+        raise NotImplementedError()
     def ask_to_set_matrix(self, matrix):
         window = Zen.Windows.CreateWindow(self.SAVE_MESSAGE)
         window.HasCancelButton = True
@@ -765,7 +771,7 @@ class AdjustMicaMatrixTask(RegistrationTask):
 class ReRegisterPointsTask(RegistrationTask):
     SAVE_MESSAGE = 'Save this registration?'
     def name(self):
-        return 'Re-register (after stage recalibration or removal)'
+        return 'Re-register (after stage recalibration or slide removal)'
     def get_pois(self):
         return self.docs.get_pois('r')
     def is_available(self):
@@ -878,6 +884,68 @@ class ManimalPoiTask(Task):
         ], cwd=self.docs.folder)
         proc.wait()
 
+class MakeMapTask(CreateTiledImageTask):
+    POI_TYPE = 'x'
+    EXPERIMENT_NAME = 'AcquireStacksTileTL.czexp'
+    MAGNIFICATION = 5
+    FILE_NAME = 'map.czi'
+    def name(self):
+        return 'Create annotated map of minerals'
+    def is_available(self):
+        pois = self.get_pois()
+        return (
+            has_at_least(pois, 2)
+            and self.docs.has_minerals
+        )
+    def extra_points(self):
+        if self.include_reg:
+            return self.docs.get_pois('r')
+        return []
+    def get_extents(self):
+        xs = list(self.get_pois())
+        if self.include_mica:
+            return [xs, list(self.docs.get_pois('m'))]
+        else:
+            return [xs]
+    def do(self):
+        window = Zen.Windows.CreateWindow('Make annotated map')
+        window.AddCheckbox('annotation', 'Add annotations', True)
+        window.AddIntegerRange('factor', 'Downsampling factor', 8, 2, 32)
+        if has_at_least(self.docs.get_pois('r'), 1):
+            window.AddCheckbox('include_reg', 'Include registration points in JPG', True)
+        if self.docs.has_mica:
+            window.AddCheckbox('include_mica', 'Include mica in JPG', False)
+        result = window.Show()
+        if result.HasCanceled:
+            return None
+        self.include_reg = result.Contains('include_reg') and result.GetValue('include_reg')
+        self.include_mica = result.Contains('include_mica') and result.GetValue('include_mica')
+        super(MakeMapTask, self).do()
+        params = [
+            'python',
+            '-m',
+            'czi2jpg',
+            '-a',
+            'poi.csv',
+            '-d',
+            str(result.GetValue('factor'))
+        ]
+        current_matrix = self.docs.maybe_current_matrix()
+        if current_matrix:
+            params.append('-r')
+            params.append(current_matrix)
+        params.append(self.FILE_NAME)
+        output_name = 'map.jpg'
+        params.append(output_name)
+        proc = subprocess.Popen(params, cwd=self.docs.folder)
+        proc.wait()
+        path = os.path.join(self.docs.folder, output_name)
+        old_image = Zen.Application.Documents.GetByFileName(path)
+        if old_image:
+            old_image.Close()
+        image = Zen.Application.LoadImage(path)
+        Zen.Application.Documents.Add(image)
+
 def acquire_stack(parameters, folder, prefix=''):
     rl_slice_count = parameters['refl_slice_count']
     rl_interval = parameters['refl_interval']
@@ -939,7 +1007,7 @@ class CaptureZStacksTask(Task):
     def drive_to(self, poi):
         self.docs.drive_to_poi(poi)
     def get_folder(self, poi):
-        raise UnsupportedException()
+        raise NotImplementedError()
     def set_folder(self, poi, folder):
         pass
     def preprocess_pois(self, pois):
@@ -1062,6 +1130,7 @@ def run_a_task(folder):
         ManimalPoiTask,
         CaptureMineralZStacksTask,
         CaptureMicaZStacksTask,
+        MakeMapTask,
         RefreshTask,
     ]
     tasks = {}
@@ -1092,6 +1161,6 @@ while run_a_task(folder):
   <Author></Author>
   <Description></Description>
   <Keywords></Keywords>
-  <Row>1060</Row>
-  <Column>21</Column>
+  <Row>769</Row>
+  <Column>65</Column>
 </Script>
