@@ -108,8 +108,11 @@ class AdjustForm(SelectForm):
     EXIT_KEEP_ALL = 'exit, keeping all points'
     TITLE = 'Choose what should happen to this POI'
     LABEL = 'What should we do with this POI?'
-    def get_prompt(self, count, total):
-        return 'Adjust position and focus ({0} of {1})'.format(count, total)
+    def get_prompt(self, count, total, kept):
+        return (
+            'Adjust position and focus ({0} of {1}) ({2} kept so far)'
+            .format(count, total, kept)
+        )
     def __init__(self, objects):
         super(AdjustForm, self).__init__(
             self.TITLE,
@@ -119,6 +122,7 @@ class AdjustForm(SelectForm):
         self.objects = list(objects)
         self.total_count = len(self.objects)
         self.count = 0
+        self.kept = 0
         self.action = None
         self.exiting = False
     def get_exit_action(self):
@@ -135,7 +139,7 @@ class AdjustForm(SelectForm):
     def try_update_adjust_action(self):
         if self.exiting:
             return True
-        Zen.Application.Pause(self.get_prompt(self.count, self.total_count))
+        Zen.Application.Pause(self.get_prompt(self.count, self.total_count, self.kept))
         self.action = self.result()
         if self.action != self.EXIT:
             return True
@@ -180,6 +184,7 @@ class AdjustForm(SelectForm):
     def run(self):
         zen.show_live()
         count = 0
+        self.kept = 0
         for o in self.objects:
             driven = False
             if not self.exiting:
@@ -189,9 +194,12 @@ class AdjustForm(SelectForm):
             if self.action == self.OK:
                 self.do_adjust(o)
                 count += 1
+                self.kept += 1
             elif self.action == self.MARK:
                 self.do_mark(o)
                 count += 1
+            elif self.action == self.LEAVE:
+                self.kept += 1
             if driven:
                 self.undrive(o)
             if self.action == self.EXIT:
@@ -247,6 +255,9 @@ def suitable(is_unsuitable, is_done):
 
 def unsuitable(is_unsuitable, is_done):
     return is_unsuitable
+
+def all_points(is_suitable, is_done):
+    return True
 
 class Documents(object):
     def load(self, filename):
@@ -333,9 +344,17 @@ class Documents(object):
             (x,y) = linear.inv_transform(self.current_matrix, x, y)
         return (x, y, Zen.Devices.Focus.ActualPosition)
     def stage_position_of_poi(self, p):
+        """
+        returns the POI's position in stage coordinates
+        """
         if self.current_matrix:
-            return linear.inv_transform(self.current_matrix, p.x, p.y)
+            return linear.transform(self.current_matrix, p.x, p.y)
         return (p.x, p.y)
+    def poi_mica_position(self, p):
+        """
+        returns the POI's mica position in project coordinates
+        """
+        return linear.transform(self.matrix, p.x, p.y)
     def delete(self, filename):
         path = os.path.join(self.folder, filename)
         if not os.path.exists(path):
@@ -385,6 +404,7 @@ class AdjustMatrixForm(AdjustForm):
     EXIT_MARK_ALL = 'exit and mark remaining POIs as unsuitable'
     HARDWARE_SETTING = hs_transmitted
     CAMERA_SETTING = camera_setting
+    FLIP = 1
     def __init__(self, pois, docs):
         super(AdjustMatrixForm, self).__init__(pois)
         self.docs = docs
@@ -404,10 +424,11 @@ class AdjustMatrixForm(AdjustForm):
         self.adjustments.append((x, y, poi.x, poi.y))
     def close(self):
         if 1 &lt; len(self.adjustments):
-            self.set_matrix_function(linear.get_transformation(self.adjustments))
+            self.set_matrix_function(linear.get_transformation(self.adjustments, self.FLIP))
         super(AdjustMatrixForm, self).close()
 
 class AdjustMicaMatrixForm(AdjustMatrixForm):
+    FLIP = -1
     def __init__(self, pois, docs, set_matrix_function):
         super(AdjustMicaMatrixForm, self).__init__(pois, docs)
         self.matrix_table = docs.matrix_table
@@ -417,6 +438,7 @@ class AdjustMicaMatrixForm(AdjustMatrixForm):
     def transform_point(self, x, y):
         return linear.transform(self.matrix, x, y)
     def drive(self, poi, count, total_count):
+        z = Zen.Devices.Focus.ActualPosition
         self.docs.drive_to_poi(poi)
         grain = Zen.Acquisition.AcquireImage(False)
         self.mirror_grain = Zen.Processing.Transformation.Geometric.Mirror(
@@ -428,6 +450,7 @@ class AdjustMicaMatrixForm(AdjustMatrixForm):
         Zen.Application.Documents.Add(self.mirror_grain)
         zen.show_live()
         super(AdjustMicaMatrixForm, self).drive(poi, count, total_count)
+        zen.set_focus(z)
     def undrive(self, poi):
         self.mirror_grain.Close()
         self.mirror_grain = None
@@ -471,8 +494,11 @@ class AddPointForm(SelectForm):
             self.LABEL,
             [self.YES, self.NO]
         )
-        self.count = docs.poi.RowCount
         self.docs = docs
+        self.count = self.initial_count()
+    def initial_count(self):
+        ps = self.docs.get_pois(self.TYPE, suitability_function=all_points)
+        return count(ps)
     def action(self):
         self.count += 1
         Zen.Application.Pause('Find a new point ({0})'.format(self.count))
@@ -528,7 +554,7 @@ class ResurrectUnsuitableForm(AdjustForm):
         super(ResurrectUnsuitableForm, self).__init__(pois)
         self.docs = docs
         self.unmarked_count = 0
-    def get_prompt(self, count, total):
+    def get_prompt(self, count, total, kept):
         return 'Resurrect point? ({0} of {1})'.format(count, total)
     def drive(self, o, count, total_count):
         self.docs.drive_to_poi(o)
@@ -566,6 +592,12 @@ def has_at_least(seq, n):
         if n &lt;= 0:
             return True
     return False
+
+def count(seq):
+    n = 0
+    for s in seq:
+        n += 1
+    return n
 
 class Task(object):
     def __init__(self, docs):
@@ -673,9 +705,45 @@ def current_magnification():
 
 def request_magnification(mag):
     if current_magnification() != mag:
-        Zen.Application.Pause('Please set the magnification to {0}x'.format(mag))
+        suffix = ' (remember to insert and set the condenser appropriately)'
+        if (mag &lt; 10):
+            suffix = ' (remember to remove the condenser)'
+        Zen.Application.Pause('Please set the magnification to {0}x{1}'.format(mag, suffix))
 
-class CreateTiledImageTask(Task):
+class NeedFocusTask(Task):
+    def get_pois(self):
+        return self.docs.get_pois(self.POI_TYPE)
+    def extent_from_pois(self, pois):
+        ps = list(pois)
+        (xmin, ymin) = self.docs.stage_position_of_poi(ps[0])
+        xmax = xmin
+        ymax = ymin
+        z = ps[0].z
+        for p in ps[1:]:
+            (x, y) = self.docs.stage_position_of_poi(p)
+            if x &lt; xmin:
+                xmin = x
+            elif xmax &lt; x:
+                xmax = x
+            if y &lt; ymin:
+                ymin = y
+            elif ymax &lt; y:
+                ymax = y
+            z += p.z
+        return (xmin, xmax, ymin, ymax, z / len(ps))
+    def get_focus_position(self):
+        ps = self.get_pois()
+        (xmin, xmax, ymin, ymax, z) = self.extent_from_pois(ps)
+        return ((xmin + xmax) / 2, (ymin + ymax) / 2)
+    def get_focussed(self):
+        (x, y) = self.get_focus_position()
+        self.docs.drive_to_xyz(x, y)
+        try:
+            zen.autofocus(self.EXPERIMENT_NAME, 10)
+        except Exception as e:
+            Zen.Application.Pause('Autofocus failed, please focus manually then click OK')
+
+class CreateTiledImageTask(NeedFocusTask):
     REG_SIZE = 50
     MAGNIFICATION = 10
     def get_pois(self):
@@ -688,27 +756,13 @@ class CreateTiledImageTask(Task):
         return []
     def do(self):
         request_magnification(self.MAGNIFICATION)
+        self.get_focussed()
         exp = Zen.Acquisition.Experiments.GetByName(self.EXPERIMENT_NAME)
         exp.ClearTileRegionsAndPositions(0)
         for ps in self.get_extents():
-            (xmin, ymin) = self.docs.stage_position_of_poi(ps[0])
-            xmax = xmin
-            ymax = ymin
-            z = ps[0].z
-            for p in ps[1:]:
-                (x, y) = self.docs.stage_position_of_poi(p)
-                if x &lt; xmin:
-                    xmin = x
-                elif xmax &lt; x:
-                    xmax = x
-                if y &lt; ymin:
-                    ymin = y
-                elif ymax &lt; y:
-                    ymax = y
-                z += p.z
+            (xmin, xmax, ymin, ymax, z) = self.extent_from_pois(ps)
             w = xmax - xmin
             h = ymax - ymin
-            z = z / len(ps)
             exp.AddRectangleTileRegion(0, xmin + w/2, ymin + h/2, w, h, z)
         for p in self.extra_points():
             (x, y) = self.docs.stage_position_of_poi(p)
@@ -722,7 +776,7 @@ class CreateTiledImageTask(Task):
 
 class CreateMineralImageTask(CreateTiledImageTask):
     POI_TYPE = 'x'
-    EXPERIMENT_NAME = 'AcquireStacksTileCPol.czexp'
+    EXPERIMENT_NAME = 'AcquireStacksTileRL.czexp'
     FILE_NAME = 'minerals.czi'
     def name(self):
         return 'Generate minerals tiled image'
@@ -755,7 +809,7 @@ class AdjustMicaMatrixTask(RegistrationTask):
     def name(self):
         return 'Fine tune mica transformation'
     def get_pois(self):
-        return self.docs.get_pois('i')
+        return self.docs.get_pois('i', suitable)
     def is_available(self):
         return has_at_least(self.get_pois(), 2) and self.docs.matrix
     def do(self):
@@ -789,7 +843,7 @@ class ReRegisterPointsTask(RegistrationTask):
 class ResetRegistrationTask(RegistrationTask):
     SAVE_MESSAGE = 'Move all points to new registration (and delete old tiled images)?'
     def name(self):
-        return 'Reset registration: move points and delete tiles images'
+        return 'Reset registration: move points and delete tiled images'
     def get_pois(self):
         return self.docs.get_pois('r')
     def is_available(self):
@@ -985,9 +1039,10 @@ def get_parameters(tl_interval, tl_slice_count, refl_interval, refl_slice_count)
         r[k] = result.GetValue(k)
     return r
 
-class CaptureZStacksTask(Task):
+class CaptureZStacksTask(NeedFocusTask):
     FILE_PREFIX = ''
     MAX_FAILURES = 3
+    EXPERIMENT_NAME = coarse_focus_experiment_name
     def poi_is_ok(self, poi):
         return True
     def get_pois(self):
@@ -996,14 +1051,17 @@ class CaptureZStacksTask(Task):
             for p in self.docs.get_pois('i', suitability_function=suitable)
             if self.poi_is_ok(p)
         ]
+    def get_focus_position(self):
+        ps = self.get_pois()
+        p = ps[0]
+        return (p.x, p.y)
     def is_available(self):
         return has_at_least(self.get_pois(), 1)
     def recommended(self):
         return True
-    def focus(self, z):
+    def focus(self):
         zen.autofocus(coarse_focus_experiment_name)
         zen.autofocus(rl_experiment_name)
-        return z
     def drive_to(self, poi):
         self.docs.drive_to_poi(poi)
     def get_folder(self, poi):
@@ -1021,6 +1079,7 @@ class CaptureZStacksTask(Task):
         failures = 0
         pois = list(self.get_pois())
         self.preprocess_pois(pois)
+        self.get_focussed()
         for poi in pois:
             self.drive_to(poi)
             c += 1
@@ -1030,7 +1089,7 @@ class CaptureZStacksTask(Task):
             try:
                 grain_folder = self.get_folder(poi)
                 if grain_folder:
-                    self.focus(Zen.Devices.Focus.ActualPosition)
+                    self.focus()
                     acquire_stack(parameters, grain_folder, self.FILE_PREFIX)
                     self.docs.save_current_matrix_as(os.path.join(
                         grain_folder, self.REGISTRATION_MATRIX_FILE_NAME
@@ -1073,6 +1132,7 @@ class CaptureMicaZStacksTask(CaptureZStacksTask):
     REGISTRATION_MATRIX_FILE_NAME = 'mica_matrix.csv'
     FILE_PREFIX = 'Mica'
     FAILURE_MESSAGE = 'Too many failures! Focus the microscope on the mica and try again'
+    EXPERIMENT_NAME = coarse_focus_experiment_name
     def __init__(self, docs):
         super(CaptureMicaZStacksTask, self).__init__(docs)
         self.current_focus = None
@@ -1085,17 +1145,18 @@ class CaptureMicaZStacksTask(CaptureZStacksTask):
             if os.path.exists(mineral) and not os.path.exists(mica):
                 return True
         return False
-    def focus(self, z):
+    def focus(self):
         if self.current_focus:
             Zen.Devices.Focus.MoveTo(self.current_focus)
         else:
-            Zen.Devices.Focus.MoveTo(z)
-            zen.autofocus(tl_coarse_focus_experiment_name)
+            self.get_focussed()
         zen.autofocus(rl_experiment_name)
         self.current_focus = Zen.Devices.Focus.ActualPosition
-        return self.current_focus
     def drive_to(self, poi):
         self.docs.drive_to_poi_mica(poi)
+    def get_focus_position(self):
+        ps = self.get_pois()
+        return self.docs.poi_mica_position(ps[0])
     def get_folder(self, poi):
         return poi.name
 
@@ -1161,6 +1222,6 @@ while run_a_task(folder):
   <Author></Author>
   <Description></Description>
   <Keywords></Keywords>
-  <Row>769</Row>
-  <Column>65</Column>
+  <Row>740</Row>
+  <Column>1</Column>
 </Script>

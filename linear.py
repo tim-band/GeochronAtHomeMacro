@@ -98,6 +98,6 @@ def inv_transform(matrix, x, y):
     xt = x - matrix[0][2]
     yt = y - matrix[1][2]
     return(
-        xt * matrix[0][0] + y * matrix[1][0],
-        yt * matrix[0][1] + y * matrix[1][1]
+        xt * matrix[0][0] + yt * matrix[1][0],
+        xt * matrix[0][1] + yt * matrix[1][1]
     )
