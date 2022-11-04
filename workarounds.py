@@ -57,6 +57,11 @@ class Workarounds:
             self.zeiss.Micro.Scripting.Research.ZenToolTab.LocateTab
         )
 
+    def switch_to_acquisition_tab(self):
+        self.zen.Application.LeftToolArea.SwitchToTab(
+            self.zeiss.Micro.Scripting.Research.ZenToolTab.AcquisitionTab
+        )
+
     def set_hardware(self, hardware_setting=None, camera_setting=None):
         """
         Set hardware and/or camera setting
@@ -77,9 +82,22 @@ class Workarounds:
         if camera_setting != None:
             self.zen.Acquisition.ActiveCamera.ApplyCameraSetting(camera_setting)
 
-    def show_live(self):
+    def get_experiment(self, experiment):
+        if type(experiment) is str:
+            e = self.zeiss.Micro.Scripting.ZenExperiment(experiment)
+            if e == None:
+                raise Exception('No such acquisition experiment {0}'.format(experiment))
+            return e
+        return experiment
+
+    def show_live(self, experiment=None):
         self.switch_to_locate_tab()
         live = self.zen.Acquisition.StartLive()
+        if experiment is not None:
+            self.switch_to_acquisition_tab()
+            live = self.zen.Acquisition.StartLive(
+                self.get_experiment(experiment)
+            )
         self.zen.Application.Documents.ActiveDocument = live
         return live
 
@@ -87,14 +105,9 @@ class Workarounds:
         """
         Autofocus using the settings in the experiment passed
         """
-        self.switch_to_locate_tab()
-        if type(experiment) is str:
-            e = self.zeiss.Micro.Scripting.ZenExperiment(experiment)
-            if e == None:
-                raise Exception('No such acquisition experiment {0}'.format(experiment))
-            experiment = e
-        self.show_live()
-        result = self.zen.Acquisition.FindAutofocus(experiment, timeoutSeconds=timeoutSeconds)
+        e = self.get_experiment(experiment)
+        self.show_live(e)
+        self.zen.Acquisition.FindAutofocus(e, timeoutSeconds=timeoutSeconds)
 
     def discard_changes(self, e):
         """

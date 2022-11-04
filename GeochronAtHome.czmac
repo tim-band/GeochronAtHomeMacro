@@ -30,6 +30,7 @@
 # Capture dosimeter images from mica (2c -&gt; 8)
 # Exit
 
+import glob
 import linear
 import math
 import os
@@ -61,6 +62,9 @@ coarse_focus_experiment_name = 'AcquireStacksFocusRLCoarse'
 tl_coarse_focus_experiment_name = 'AcquireStacksFocusTLCoarse'
 
 camera_setting = '100ms'
+
+class UserCancelledException(Exception):
+    pass
 
 class SelectForm(Form):
     def __init__(self, title, label, options):
@@ -278,6 +282,12 @@ class Documents(object):
     def save_current_matrix_as(self, path):
         if self.current_matrix_table:
             self.current_matrix_table.Save(path)
+    def minerals_files(self):
+        pattern = os.path.join(self.folder, 'minerals*.czi')
+        return glob.glob(pattern)
+    def minerals_file_exists(self):
+        names = self.minerals_files()
+        return 0 &lt; len(names)
     def __init__(self, folder):
         self.folder = folder
         self.poi = self.load('poi.csv')
@@ -294,9 +304,14 @@ class Documents(object):
         # Transformation from project co-ordinates to current stage co-ordinates
         self.current_matrix_table = self.load('current_reg_matrix.csv')
         self.current_matrix = linear.table_to_matrix(self.current_matrix_table)
-        self.has_minerals = self.exists('minerals.czi')
+        self.has_minerals = self.minerals_file_exists()
         self.has_mica = self.exists('mica.czi')
         self.grain_folder_number = 1
+    def get_mica_z(self):
+        mica = Zen.Application.LoadImage(os.path.join(self.folder, 'mica.czi'))
+        z = mica.Metadata.FocusPositionMicron
+        mica.Close()
+        return z
     def get_current_matrix_table(self):
         if self.current_matrix_table:
             return self.current_matrix_table
@@ -355,16 +370,19 @@ class Documents(object):
         returns the POI's mica position in project coordinates
         """
         return linear.transform(self.matrix, p.x, p.y)
-    def delete(self, filename):
-        path = os.path.join(self.folder, filename)
+    def delete_full_path(self, filename):
         if not os.path.exists(path):
             return
         doc = Zen.Application.Documents.GetByFileName(path)
         if doc:
             doc.Close()
         os.remove(path)
+    def delete(self, filename):
+        path = os.path.join(self.folder, filename)
+        self.delete_full_path(path)
     def delete_minerals(self):
-        self.delete('minerals.czi')
+        for n in self.minerals_files():
+            self.delete_full_path(n)
         self.has_minerals = False
     def delete_mica(self):
         self.delete('mica.czi')
@@ -741,6 +759,7 @@ class NeedFocusTask(Task):
         try:
             zen.autofocus(self.EXPERIMENT_NAME, 10)
         except Exception as e:
+            zen.show_live(self.EXPERIMENT_NAME)
             Zen.Application.Pause('Autofocus failed, please focus manually then click OK')
 
 class CreateTiledImageTask(NeedFocusTask):
@@ -754,8 +773,10 @@ class CreateTiledImageTask(NeedFocusTask):
         return has_at_least(self.get_pois(), 2)
     def extra_points(self):
         return []
-    def do(self):
+    def user_setup(self):
         request_magnification(self.MAGNIFICATION)
+    def do(self):
+        self.user_setup()
         self.get_focussed()
         exp = Zen.Acquisition.Experiments.GetByName(self.EXPERIMENT_NAME)
         exp.ClearTileRegionsAndPositions(0)
@@ -778,6 +799,28 @@ class CreateMineralImageTask(CreateTiledImageTask):
     POI_TYPE = 'x'
     EXPERIMENT_NAME = 'AcquireStacksTileRL.czexp'
     FILE_NAME = 'minerals.czi'
+    EXPERIMENT_NAMES = {
+        'reflected': 'AcquireStacksTileRL.czexp',
+        'transmitted': 'AcquireStacksTileTL.czexp',
+        'circularly polarized': 'AcquireStacksTileCPol.czexp'
+    }
+    FILE_NAMES = {
+        'reflected': 'mineralsRL.czi',
+        'transmitted': 'mineralsTL.czi',
+        'circularly polarized': 'mineralsCPol.czi'
+    }
+    def user_setup(self):
+        super(CreateMineralImageTask, self).user_setup()
+        window = Zen.Windows.CreateWindow('Select lighting')
+        window.AddDropDown(
+            'lighting', 'Lighting', self.EXPERIMENT_NAMES.keys(), 0
+        )
+        result = window.Show()
+        if result.HasCanceled:
+            raise UserCancelledException()
+        lighting = result.GetValue('lighting')
+        self.EXPERIMENT_NAME = self.EXPERIMENT_NAMES[lighting]
+        self.FILE_NAME = self.FILE_NAMES[lighting]
     def name(self):
         return 'Generate minerals tiled image'
     def recommended(self):
@@ -908,7 +951,7 @@ class GetMicaMatrixTask(Task):
             '-m',
             'matrix.csv',
             '-f',
-            'minerals.czi',
+            'minerals*.czi',
             '-a',
             'mica.czi'
         ], cwd=self.docs.folder)
@@ -934,13 +977,15 @@ class ManimalPoiTask(Task):
             '-p',
             'poi.csv',
             '-f',
-            'minerals.czi',
+            'minerals*.czi',
+            '--magsize',
+            '250x200',
         ], cwd=self.docs.folder)
         proc.wait()
 
 class MakeMapTask(CreateTiledImageTask):
     POI_TYPE = 'x'
-    EXPERIMENT_NAME = 'AcquireStacksTileTL.czexp'
+    EXPERIMENT_NAME = 'AcquireStacksMapTL.czexp'
     MAGNIFICATION = 5
     FILE_NAME = 'map.czi'
     def name(self):
@@ -1101,6 +1146,7 @@ class CaptureZStacksTask(NeedFocusTask):
                 failures += 1
                 if failures == self.MAX_FAILURES:
                     Zen.Application.Pause(self.FAILURE_MESSAGE)
+                    return
 
 class CaptureMineralZStacksTask(CaptureZStacksTask):
     REGISTRATION_MATRIX_FILE_NAME = 'mineral_matrix.csv'
@@ -1150,6 +1196,7 @@ class CaptureMicaZStacksTask(CaptureZStacksTask):
             Zen.Devices.Focus.MoveTo(self.current_focus)
         else:
             self.get_focussed()
+        zen.autofocus(coarse_focus_experiment_name)
         zen.autofocus(rl_experiment_name)
         self.current_focus = Zen.Devices.Focus.ActualPosition
     def drive_to(self, poi):
@@ -1222,6 +1269,6 @@ while run_a_task(folder):
   <Author></Author>
   <Description></Description>
   <Keywords></Keywords>
-  <Row>740</Row>
-  <Column>1</Column>
+  <Row>757</Row>
+  <Column>47</Column>
 </Script>
