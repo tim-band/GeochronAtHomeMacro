@@ -48,7 +48,8 @@ clr.AddReference('System.Windows.Forms')
 
 from System.Windows.Forms import (
     AnchorStyles, Application, AutoSizeMode,
-    Form, Label, ListBox, TableLayoutPanel
+    Form, Label, ListBox, TableLayoutPanel,
+    ProgressBar, TextBox, ScrollBars
 )
 
 zen = workarounds.Workarounds(Zen, Zeiss)
@@ -66,6 +67,71 @@ camera_setting = '100ms'
 class UserCancelledException(Exception):
     pass
 
+class ProgressOutput(Form):
+    def __init__(self, count):
+        super(ProgressOutput, self).__init__()
+        width = 450
+        self.Text = "Progress"
+        self.AutoSize = True
+        self.AutoSizeMode = AutoSizeMode.GrowAndShrink
+        self.layout = TableLayoutPanel()
+        self.layout.AutoSize = True
+        self.layout.AutoSizeMode = AutoSizeMode.GrowAndShrink
+        self.Controls.Add(self.layout)
+        self.progress = ProgressBar()
+        self.progress.Maximum = count
+        self.progress.Step = 1
+        self.progress.Width = width
+        self.layout.Controls.Add(self.progress, 0, 0)
+        self.current = TextBox()
+        self.current.ReadOnly = True
+        self.current.Width = width
+        self.layout.Controls.Add(self.current, 0, 1)
+        self.etaLabel = Label()
+        self.etaLabel.Text = "estimated finish time:"
+        self.etaLabel.Width = width
+        self.layout.Controls.Add(self.etaLabel, 0, 2)
+        self.eta = TextBox()
+        self.eta.ReadOnly = True
+        self.eta.Width = width
+        self.layout.Controls.Add(self.eta, 0, 3)
+        self.failLabel = Label()
+        self.failLabel.Text = "failures:"
+        self.failLabel.Width = width
+        self.layout.Controls.Add(self.failLabel, 0, 4)
+        self.failures = TextBox()
+        self.failures.ReadOnly = True
+        self.failures.Multiline = True
+        self.failures.Width = width
+        self.failures.Height = 140
+        self.failures.ScrollBars = ScrollBars.Vertical
+        self.layout.Controls.Add(self.failures, 0, 5)
+        self.in_task = False
+        self.duration = 0
+        self.TopMost = True
+        self.Show()
+    def result(self):
+        return self.combo.SelectedItem
+    def close(self):
+        self.Close()
+        self.Dispose()
+    def start(self, name):
+        self.current.Text = name
+        self.in_task = True
+        self.start_time = time.clock()
+    def stop(self, success):
+        if not self.in_task:
+            return
+        self.in_task = False
+        self.duration += time.clock() - self.start_time
+        self.progress.PerformStep()
+        eta = time.time() + self.duration / self.progress.Value * self.progress.Maximum
+        self.eta.Text = time.strftime('%H:%M', time.localtime(eta))
+        if not success:
+            if 0 &lt; len(self.failures.Text):
+                self.failures.Text += "\n"
+            self.failures.Text += self.current.Text
+
 class SelectForm(Form):
     def __init__(self, title, label, options):
         super(SelectForm, self).__init__()
@@ -80,7 +146,6 @@ class SelectForm(Form):
         self.label.Text = label
         self.label.Width = 140
         self.label.Height = 80
-        #self.label.AutoSize = True
         self.layout.Controls.Add(self.label, 0, 0)
         self.combo = ListBox()
         for s in options:
@@ -1014,6 +1079,7 @@ class MakeMapTask(CreateTiledImageTask):
             window.AddCheckbox('include_reg', 'Include registration points in JPG', True)
         if self.docs.has_mica:
             window.AddCheckbox('include_mica', 'Include mica in JPG', False)
+        window.AddCheckbox('flip', 'Flip image', True)
         result = window.Show()
         if result.HasCanceled:
             return None
@@ -1033,6 +1099,8 @@ class MakeMapTask(CreateTiledImageTask):
         if current_matrix:
             params.append('-r')
             params.append(current_matrix)
+        if result.GetValue('flip'):
+            params.append('-f')
         params.append(self.FILE_NAME)
         output_name = 'map.jpg'
         params.append(output_name)
@@ -1125,28 +1193,35 @@ class CaptureZStacksTask(NeedFocusTask):
         pois = list(self.get_pois())
         self.preprocess_pois(pois)
         self.get_focussed()
-        for poi in pois:
-            self.drive_to(poi)
-            c += 1
-            print('capturing {0} out of {1} POIs (row {2}) at {3}'.format(
-                c, len(pois), poi.table_row + 1, time.strftime('%H:%M:%S', time.localtime())
-            ))
-            try:
-                grain_folder = self.get_folder(poi)
-                if grain_folder:
-                    self.focus()
-                    acquire_stack(parameters, grain_folder, self.FILE_PREFIX)
-                    self.docs.save_current_matrix_as(os.path.join(
-                        grain_folder, self.REGISTRATION_MATRIX_FILE_NAME
-                    ))
-                    self.set_folder(poi, grain_folder)
-            except Exception as e:
-                print e
-                print type(e)
-                failures += 1
-                if failures == self.MAX_FAILURES:
-                    Zen.Application.Pause(self.FAILURE_MESSAGE)
-                    return
+        with ProgressOutput(len(pois)) as progress:
+            for poi in pois:
+                self.drive_to(poi)
+                c += 1
+                print('capturing {0} out of {1} POIs (row {2}) at {3}'.format(
+                    c, len(pois), poi.table_row + 1, time.strftime('%H:%M:%S', time.localtime())
+                ))
+                success = False
+                try:
+                    grain_folder = self.get_folder(poi)
+                    if grain_folder:
+                        progress.start(grain_folder)
+                        self.focus()
+                        acquire_stack(parameters, grain_folder, self.FILE_PREFIX)
+                        self.docs.save_current_matrix_as(os.path.join(
+                            grain_folder, self.REGISTRATION_MATRIX_FILE_NAME
+                        ))
+                        self.set_folder(poi, grain_folder)
+                        success = True
+                except Exception as e:
+                    print e
+                    print type(e)
+                    failures += 1
+                    if failures == self.MAX_FAILURES:
+                        Zen.Application.Pause(self.FAILURE_MESSAGE)
+                        return
+                progress.stop(success)
+            if failures != 0:
+                Zen.Application.Pause('Finished, but with {0} failures'.format(failures))
 
 class CaptureMineralZStacksTask(CaptureZStacksTask):
     REGISTRATION_MATRIX_FILE_NAME = 'mineral_matrix.csv'
@@ -1259,7 +1334,10 @@ def run_a_task(folder):
     r = window.Show()
     if r.HasCanceled:
         return False
-    tasks[r.GetValue('task')].do()
+    try:
+        tasks[r.GetValue('task')].do()
+    except UserCancelledException:
+        pass
     return True
 
 folder = get_project_folder()
@@ -1269,6 +1347,6 @@ while run_a_task(folder):
   <Author></Author>
   <Description></Description>
   <Keywords></Keywords>
-  <Row>757</Row>
-  <Column>47</Column>
+  <Row>1098</Row>
+  <Column>29</Column>
 </Script>
