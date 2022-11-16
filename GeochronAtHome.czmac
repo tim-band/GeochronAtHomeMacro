@@ -107,8 +107,9 @@ class ProgressOutput(Form):
         self.failures.ScrollBars = ScrollBars.Vertical
         self.layout.Controls.Add(self.failures, 0, 5)
         self.in_task = False
-        self.duration = 0
         self.TopMost = True
+        self.start_time = time.time()
+        self.start_clock = time.clock()
         self.Show()
     def result(self):
         return self.combo.SelectedItem
@@ -118,14 +119,13 @@ class ProgressOutput(Form):
     def start(self, name):
         self.current.Text = name
         self.in_task = True
-        self.start_time = time.clock()
     def stop(self, success):
         if not self.in_task:
             return
         self.in_task = False
-        self.duration += time.clock() - self.start_time
         self.progress.PerformStep()
-        eta = time.time() + self.duration / self.progress.Value * self.progress.Maximum
+        duration = time.clock() - self.start_clock
+        eta = self.start_time + duration / self.progress.Value * self.progress.Maximum
         self.eta.Text = time.strftime('%H:%M', time.localtime(eta))
         if not success:
             if 0 &lt; len(self.failures.Text):
@@ -334,16 +334,18 @@ class Documents(object):
         return Zen.Application.LoadTable(
             os.path.join(self.folder, filename)
         )
+    def save(self, table, filename):
+        table.Save(os.path.join(self.folder, filename))
     def exists(self, filename):
         return os.path.exists(
             os.path.join(self.folder, filename)
         )
     def save_poi(self):
-        self.poi.Save(os.path.join(self.folder, 'poi.csv'))
+        self.save(self.poi, 'poi.csv')
     def save_matrix(self):
-        self.matrix_table.Save(os.path.join(self.folder, 'matrix.csv'))
+        self.save(self.matrix_table, 'matrix.csv')
     def save_current_matrix(self):
-        self.current_matrix_table.Save(os.path.join(self.folder, 'current_reg_matrix.csv'))
+        self.save(self.current_matrix_table, 'current_reg_matrix.csv')
     def save_current_matrix_as(self, path):
         if self.current_matrix_table:
             self.current_matrix_table.Save(path)
@@ -372,11 +374,6 @@ class Documents(object):
         self.has_minerals = self.minerals_file_exists()
         self.has_mica = self.exists('mica.czi')
         self.grain_folder_number = 1
-    def get_mica_z(self):
-        mica = Zen.Application.LoadImage(os.path.join(self.folder, 'mica.czi'))
-        z = mica.Metadata.FocusPositionMicron
-        mica.Close()
-        return z
     def get_current_matrix_table(self):
         if self.current_matrix_table:
             return self.current_matrix_table
@@ -435,7 +432,7 @@ class Documents(object):
         returns the POI's mica position in project coordinates
         """
         return linear.transform(self.matrix, p.x, p.y)
-    def delete_full_path(self, filename):
+    def delete_full_path(self, path):
         if not os.path.exists(path):
             return
         doc = Zen.Application.Documents.GetByFileName(path)
@@ -463,6 +460,17 @@ class Documents(object):
             if not os.path.exists(name):
                 return name
             self.grain_folder_number += 1
+    def load_mica_surface_estimator(self):
+        table = None
+        if self.exists('mica_surface.csv'):
+            table = self.load('mica_surface.csv')
+        return linear.Regression(table)
+    def save_mica_surface_estimator(self, regression):
+        table = ZenTable('mica_surface.csv')
+        regression.save(table)
+        self.save(table, 'mica_surface.csv')
+    def delete_mica_surface_estimator(self):
+        self.delete('mica_surface.csv')
 
 class AdjustPoiForm(AdjustForm):
     HARDWARE_SETTING = hs_transmitted
@@ -518,10 +526,13 @@ class AdjustMicaMatrixForm(AdjustMatrixForm):
         self.matrix = linear.table_to_matrix(self.matrix_table)
         self.set_matrix_function = set_matrix_function
         self.docs = docs
+        self.focus_estimator = docs.load_mica_surface_estimator()
+        self.backup_focus_estimator = None if self.focus_estimator.count() == 0 else linear.Regression()
+        self.focussing_failures = 0
     def transform_point(self, x, y):
         return linear.transform(self.matrix, x, y)
     def drive(self, poi, count, total_count):
-        z = Zen.Devices.Focus.ActualPosition
+        self.current_focus = Zen.Devices.Focus.ActualPosition
         self.docs.drive_to_poi(poi)
         grain = Zen.Acquisition.AcquireImage(False)
         self.mirror_grain = Zen.Processing.Transformation.Geometric.Mirror(
@@ -533,10 +544,33 @@ class AdjustMicaMatrixForm(AdjustMatrixForm):
         Zen.Application.Documents.Add(self.mirror_grain)
         zen.show_live()
         super(AdjustMicaMatrixForm, self).drive(poi, count, total_count)
-        zen.set_focus(z)
+        if 3 &lt;= self.focus_estimator.count():
+            self.current_focus = self.focus_estimator.estimate_z(
+                Zen.Devices.Stage.ActualPositionX,
+                Zen.Devices.Stage.ActualPositionY
+            )
+        zen.set_focus(self.current_focus)
     def undrive(self, poi):
         self.mirror_grain.Close()
         self.mirror_grain = None
+    def do_adjust(self, poi):
+        super(AdjustMicaMatrixForm, self).do_adjust(poi)
+        x = Zen.Devices.Stage.ActualPositionX
+        y = Zen.Devices.Stage.ActualPositionY
+        z = Zen.Devices.Focus.ActualPosition
+        self.focus_estimator.add(x, y, z)
+        if self.backup_focus_estimator is not None:
+            self.backup_focus_estimator.add(x, y, z)
+        if (
+            self.current_focus is not None
+            and self.backup_focus_estimator is not None
+            and 15 &lt; abs(self.current_focus - z)
+        ):
+            self.focussing_failures += 1
+            if 3 &lt;= self.focussing_failures:
+                # Throw away previous surface information, it wasn't working
+                self.focus_estimator = self.backup_focus_estimator
+                self.backup_focus_estimator = None
     def do_mark(self, poi):
         poi.name = '# Unsuitable'
         self.marked_count += 1
@@ -545,6 +579,7 @@ class AdjustMicaMatrixForm(AdjustMatrixForm):
     def close(self):
         if 0 &lt; self.marked_count:
             self.docs.save_poi()
+        self.docs.save_mica_surface_estimator(self.focus_estimator)
         super(AdjustMicaMatrixForm, self).close()
 
 class ReRegisterPointsForm(AdjustMatrixForm):
@@ -1183,6 +1218,8 @@ class CaptureZStacksTask(NeedFocusTask):
         pass
     def preprocess_pois(self, pois):
         pass
+    def too_many_failures(self):
+        pass
     def do(self):
         parameters = get_parameters(0.3, 17, 1.0, 3)
         if not parameters:
@@ -1218,6 +1255,7 @@ class CaptureZStacksTask(NeedFocusTask):
                     failures += 1
                     if failures == self.MAX_FAILURES:
                         Zen.Application.Pause(self.FAILURE_MESSAGE)
+                        self.too_many_failures()
                         return
                 progress.stop(success)
             if failures != 0:
@@ -1252,11 +1290,11 @@ class CaptureMineralZStacksTask(CaptureZStacksTask):
 class CaptureMicaZStacksTask(CaptureZStacksTask):
     REGISTRATION_MATRIX_FILE_NAME = 'mica_matrix.csv'
     FILE_PREFIX = 'Mica'
-    FAILURE_MESSAGE = 'Too many failures! Focus the microscope on the mica and try again'
+    FAILURE_MESSAGE = 'Too many failures! Please try again'
     EXPERIMENT_NAME = coarse_focus_experiment_name
     def __init__(self, docs):
         super(CaptureMicaZStacksTask, self).__init__(docs)
-        self.current_focus = None
+        self.focus_estimator = docs.load_mica_surface_estimator()
     def name(self):
         return 'Capture Mica Z-Stacks for existing Mineral Z-Stacks'
     def poi_is_ok(self, poi):
@@ -1267,18 +1305,36 @@ class CaptureMicaZStacksTask(CaptureZStacksTask):
                 return True
         return False
     def focus(self):
-        if self.current_focus:
-            Zen.Devices.Focus.MoveTo(self.current_focus)
+        if self.focus_estimator.count() &lt; 3:
+            Zen.Application.Pause('Please focus manually')
+            self.focus_estimator.add(
+                Zen.Devices.Stage.ActualPositionX,
+                Zen.Devices.Stage.ActualPositionY,
+                Zen.Devices.Focus.ActualPosition
+            )
         else:
-            self.get_focussed()
-        zen.autofocus(coarse_focus_experiment_name)
-        zen.autofocus(rl_experiment_name)
-        self.current_focus = Zen.Devices.Focus.ActualPosition
+            z = self.focus_estimator.estimate_z(
+                Zen.Devices.Stage.ActualPositionX,
+                Zen.Devices.Stage.ActualPositionY
+            )
+            Zen.Devices.Focus.MoveTo(z)
+            zen.autofocus(rl_experiment_name)
+            self.focus_estimator.add(
+                Zen.Devices.Stage.ActualPositionX,
+                Zen.Devices.Stage.ActualPositionY,
+                Zen.Devices.Focus.ActualPosition
+            )
     def drive_to(self, poi):
         self.docs.drive_to_poi_mica(poi)
-    def get_focus_position(self):
-        ps = self.get_pois()
-        return self.docs.poi_mica_position(ps[0])
+    def get_focussed(self):
+        pass
+    def too_many_failures(self):
+        success_count = self.focus_estimator.count()
+        if success_count &lt;= 3 + self.MAX_FAILURES:
+            # You get three successes for free. If your extra successes
+            # don't outnumber your failures, it's probably a good idea
+            # to throw away the current failing surface estimator
+            self.docs.delete_mica_surface_estimator()
     def get_folder(self, poi):
         return poi.name
 
@@ -1347,6 +1403,6 @@ while run_a_task(folder):
   <Author></Author>
   <Description></Description>
   <Keywords></Keywords>
-  <Row>1098</Row>
-  <Column>29</Column>
+  <Row>546</Row>
+  <Column>1</Column>
 </Script>
