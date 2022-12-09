@@ -312,7 +312,10 @@ class Poi(object):
         mz = self.table.GetValue(self.row, 5)
         if mz is None:
             return None
-        return float(mz)
+        try:
+            return float(mz.strip())
+        except ValueError:
+            return None
     @micaZ.setter
     def micaZ(self, value):
         self.table.SetValue(self.row, 5, value)
@@ -636,9 +639,12 @@ class AddPointForm(SelectForm):
         ps = self.docs.get_pois(self.TYPE, suitability_function=all_points)
         return count(ps)
     def action(self):
-        self.count += 1
-        Zen.Application.Pause('Find a new point ({0})'.format(self.count))
-        return self.result() == self.YES
+        n = self.count + 1
+        Zen.Application.Pause('Find a new point ({0})'.format(n))
+        if self.result() == self.YES:
+            self.count = n
+            return True
+        return False
     def run(self):
         zen.show_live()
         self.show()
@@ -1167,40 +1173,46 @@ class MakeMapTask(CreateTiledImageTask):
         Zen.Application.Documents.Add(image)
 
 def acquire_stack(parameters, folder, prefix=''):
-    rl_slice_count = parameters['refl_slice_count']
-    rl_interval = parameters['refl_interval']
-    tl_slice_count = parameters['slice_count']
-    tl_interval = parameters['trans_interval']
+    rl_slice_start = -parameters['rl_slice_above']
+    rl_slice_end = parameters['rl_slice_below']
+    rl_interval = parameters['rl_interval']
+    tl_slice_start = -parameters['tl_slice_above']
+    tl_slice_end = parameters['tl_slice_below']
+    tl_interval = parameters['tl_interval']
     focus = Zen.Devices.Focus.ActualPosition
     zen.set_hardware(camera_setting=camera_setting)
     zen.set_hardware(hs_reflected, camera_setting)
-    for i in range(rl_slice_count):
+    for i in range(rl_slice_start, rl_slice_end):
         Zen.Devices.Focus.MoveTo(focus + i * rl_interval)
         im = Zen.Acquisition.AcquireImage()
         im.Save(os.path.join(folder, "{1}ReflStack-{0:02d}.jpg".format(i, prefix)), 80)
     zen.set_hardware(hs_transmitted, camera_setting)
-    for i in range(0, tl_slice_count):
+    for i in range(tl_slice_start, tl_slice_end):
         Zen.Devices.Focus.MoveTo(focus + i * tl_interval)
         im = Zen.Acquisition.AcquireImage()
         im.Save(os.path.join(folder, "{1}Stack-{0:02d}.jpg".format(i, prefix)), 80)
     Zen.Devices.Focus.MoveTo(focus)
 
-def get_parameters(tl_interval, tl_slice_count, refl_interval, refl_slice_count):
+def get_parameters(tl_interval, tl_slice_above, tl_slice_below, rl_interval, rl_slice_above, rl_slice_below):
     window = Zen.Windows.CreateWindow('Acquire image stacks')
-    window.AddDoubleRange('trans_interval', 'Focus interval (transmitted light, microns)', tl_interval, 0.1, 2.0)
-    window.AddIntegerRange('slice_count', 'Slices in Z-stack (transmitted light)', tl_slice_count, 0, 30)
-    window.AddDoubleRange('refl_interval', 'Focus interval (reflected light, microns)', refl_interval, 0.1, 2.0)
-    window.AddIntegerRange('refl_slice_count', 'Slices in Z-stack (reflected light)', refl_slice_count, 0, 10)
+    window.AddDoubleRange('tl_interval', 'Focus interval (transmitted light, microns)', tl_interval, 0.1, 2.0)
+    window.AddIntegerRange('tl_slice_above', 'Number of slices above found focus in Z-stack (transmitted light)', tl_slice_above, 0, 10)
+    window.AddIntegerRange('tl_slice_below', 'Number of slices at or below found focus in Z-stack (transmitted light)', tl_slice_below, 0, 30)
+    window.AddDoubleRange('rl_interval', 'Focus interval (reflected light, microns)', rl_interval, 0.1, 2.0)
+    window.AddIntegerRange('rl_slice_above', 'Number of slices above found focus in Z-stack (reflected light)', rl_slice_above, 0, 10)
+    window.AddIntegerRange('rl_slice_below', 'Number of slices at or below found focus in Z-stack (reflected light)', rl_slice_below, 0, 10)
     window.AddTextBlock('Please select the 50x objective, set the condensor and set the transmitted light filters to 6,100')
     result = window.Show()
     if result.HasCanceled:
         return None
     r = {}
     for k in [
-        'trans_interval',
-        'slice_count',
-        'refl_interval',
-        'refl_slice_count'
+        'tl_interval',
+        'tl_slice_above',
+        'tl_slice_below',
+        'rl_interval',
+        'rl_slice_above',
+        'rl_slice_below'
     ]:
         r[k] = result.GetValue(k)
     return r
@@ -1240,7 +1252,7 @@ class CaptureZStacksTask(NeedFocusTask):
     def too_many_failures(self):
         pass
     def do(self):
-        parameters = get_parameters(0.3, 17, 1.0, 3)
+        parameters = get_parameters(0.3, 5, 17, 1.0, 3, 3)
         if not parameters:
             return
         request_magnification(50)
