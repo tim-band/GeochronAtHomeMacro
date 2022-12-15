@@ -316,6 +316,12 @@ class Poi(object):
             return float(mz.strip())
         except ValueError:
             return None
+        except AttributeError:
+            return None
+        except Exception as e:
+            print type(e)
+            print e
+            return None
     @micaZ.setter
     def micaZ(self, value):
         self.table.SetValue(self.row, 5, value)
@@ -406,6 +412,13 @@ class Documents(object):
             return None
         return 'current_reg_matrix.csv'
     def get_pois(self, type='i', suitability_function=suitable_and_not_done):
+        for i in range(self.poi.RowCount):
+            name = self.poi.GetValue(i,4)
+            if name != '' and name[0] != '#' and not os.path.exists(name):
+                # POI has a path but that path is no longer valid.
+                # We must delete this path in case it gets recreated
+                # again as another POI's path!
+                self.poi.SetValue(i, 4, '')
         for i in range(self.poi.RowCount):
             t = self.poi.GetValue(i,0)
             name = self.poi.GetValue(i,4)
