@@ -70,14 +70,20 @@ class Workarounds:
         if type(hardware_setting) is str:
             hs = self.zen.Application.HardwareSettings.GetByName(hardware_setting)
             if hs == None:
-                raise Exception('No such harware setting {0}'.format(hardware_setting))
+                print dir(self.zeiss.Micro.Scripting.ZenHardwareSetting)
+                print hardware_setting
+                hs = self.zeiss.Micro.Scripting.ZenHardwareSetting.__class__(hardware_setting)
+                if hs == None:
+                    raise Exception('No such harware setting {0}'.format(hardware_setting))
             hardware_setting = hs
         if hardware_setting != None:
             self.zen.Devices.ApplyHardwareSetting(hardware_setting)
         if type(camera_setting) == str:
             cs = self.zen.Acquisition.CameraSettings.GetByName(camera_setting)
             if cs == None:
-                raise Exception('No such camera setting {0}'.format(camera_setting))
+                cs = self.zeiss.Micro.Scripting.ZenCameraSetting.__class__(camera_setting)
+                if cs == None:
+                    raise Exception('No such camera setting {0}'.format(camera_setting))
             camera_setting = cs
         if camera_setting != None:
             self.zen.Acquisition.ActiveCamera.ApplyCameraSetting(camera_setting)

@@ -49,20 +49,31 @@ clr.AddReference('System.Windows.Forms')
 from System.Windows.Forms import (
     AnchorStyles, Application, AutoSizeMode,
     Form, Label, ListBox, TableLayoutPanel,
-    ProgressBar, TextBox, ScrollBars
+    PictureBox, PictureBoxSizeMode, ProgressBar,
+    TextBox, ScrollBars
 )
 from System import (Environment)
 
 zen = workarounds.Workarounds(Zen, Zeiss)
 
-hs_reflected = 'AcquireStacksReflected'
-hs_transmitted = 'AcquireStacksTransmitted'
+def resource_location(name):
+    return os.path.join(
+        Zen.Application.Environment.GetFolderPath(ZenSpecialFolder.UserDocuments),
+        'Macros',
+        'GeochronAtHome',
+        name
+    )
 
-tl_experiment_name = 'AcquireStacksTileTL'
-rl_experiment_name = 'AcquireStacksFocusRL'
-coarse_focus_experiment_name = 'AcquireStacksFocusRLCoarse'
-tl_coarse_focus_experiment_name = 'AcquireStacksFocusTLCoarse'
+tile_tl_experiment_name = resource_location('TileTL.czexp')
+tile_rl_experiment_name = resource_location('TileRL.czexp')
+tile_cpol_experiment_name = resource_location('TileCPol.czexp')
+fine_focus_experiment_name = resource_location('FocusRL.czexp')
+coarse_focus_experiment_name = resource_location('FocusRLCoarse.czexp')
+map_experiment_name = resource_location('MapTL.czexp')
 
+# For some reason, hardware settings don't work in other directories
+hs_reflected = 'Reflected'
+hs_transmitted = 'Transmitted'
 camera_setting = '100ms'
 
 class UserCancelledException(Exception):
@@ -461,6 +472,13 @@ class Documents(object):
         returns the POI's mica position in project coordinates
         """
         return linear.transform(self.matrix, p.x, p.y)
+    def mica_angle(self):
+        """
+        Returns the angle (after mirroring) to rotate a piture
+        of a mineral by to make it match a mica, in degrees clockwise.
+        """
+        rads = math.atan2(self.matrix[1][0], -self.matrix[0][0])
+        return math.degrees(-rads)
     def delete_full_path(self, path):
         if not os.path.exists(path):
             return
@@ -500,6 +518,41 @@ class Documents(object):
         self.save(table, 'mica_surface.csv')
     def delete_mica_surface_estimator(self):
         self.delete('mica_surface.csv')
+    def store_registration_point_images(self):
+        filename_pattern = os.path.join(self.folder, 'RegistrationPoints', 'Reg{0}.jpg')
+        i = 0
+        for reg in self.get_pois(type='r', suitability_function=all_points):
+            i += 1
+            self.drive_to_poi(reg)
+            im = Zen.Acquisition.AcquireImage()
+            cx = im.Bounds.SizeX / 2
+            cy = im.Bounds.SizeY / 2
+            arrow1 = im.Graphics.Add(ZenGraphicCategory.Arrow)
+            arrow1.X1 = cx - 250
+            arrow1.X2 = cx - 50
+            arrow1.Y1 = cy
+            arrow1.Y2 = cy
+            arrow1.Thickness = 3
+            arrow1.StrokeColor = ZenColors.Red
+            arrow1.IsMeasurementVisible = False
+            arrow1.RotationAngle = 0
+            arrow2 = im.Graphics.Add(ZenGraphicCategory.Arrow)
+            arrow2.X1 = cx
+            arrow2.X2 = cx
+            arrow2.Y1 = cy - 250
+            arrow2.Y2 = cy - 50
+            arrow2.Thickness = 3
+            arrow2.StrokeColor = ZenColors.Red
+            arrow2.IsMeasurementVisible = False
+            arrow2.RotationAngle = 0
+            im2 = im.BurnInGraphics()
+            filename = filename_pattern.format(i)
+            im2.Save(filename, 70)
+            im.Close()
+            im2.Close()
+            reg.name = filename
+        self.save_poi()
+
 
 class AdjustPoiForm(AdjustForm):
     HARDWARE_SETTING = hs_transmitted
@@ -564,13 +617,31 @@ class AdjustMicaMatrixForm(AdjustMatrixForm):
         self.current_focus = Zen.Devices.Focus.ActualPosition
         self.docs.drive_to_poi(poi)
         grain = Zen.Acquisition.AcquireImage(False)
-        self.mirror_grain = Zen.Processing.Transformation.Geometric.Mirror(
+        mirror_grain = Zen.Processing.Transformation.Geometric.Mirror(
             grain,
             ZenMirrorMode.FlipHorizontal,
             ZenThirdProcessingDimension.None,
             False
         )
-        Zen.Application.Documents.Add(self.mirror_grain)
+        rotated = Zen.Processing.Transformation.Geometric.Rotate2D(
+            mirror_grain,
+            ZenInterpolation.NearestNeighbour,
+            self.docs.mica_angle(),
+            False,
+            False,
+            False
+        )
+        mbounds = mirror_grain.Bounds
+        rbounds = rotated.Bounds
+        startX = (rbounds.SizeX - mbounds.SizeX) / 2
+        startY = (rbounds.SizeY - mbounds.SizeY) / 2
+        self.rotated_grain = rotated.CreateSubImage('X({0}-{1})|Y({2}-{3})'.format(
+            startX,
+            startX + mbounds.SizeX - 1,
+            startY,
+            startY + mbounds.SizeY - 1
+        ))
+        Zen.Application.Documents.Add(self.rotated_grain)
         zen.show_live()
         super(AdjustMicaMatrixForm, self).drive(poi, count, total_count)
         micaZ = poi.micaZ
@@ -583,8 +654,8 @@ class AdjustMicaMatrixForm(AdjustMatrixForm):
             )
         zen.set_focus(self.current_focus)
     def undrive(self, poi):
-        self.mirror_grain.Close()
-        self.mirror_grain = None
+        self.rotated_grain.Close()
+        self.rotated_grain = None
     def do_adjust(self, poi):
         self.savePois = True
         super(AdjustMicaMatrixForm, self).do_adjust(poi)
@@ -620,12 +691,25 @@ class ReRegisterPointsForm(AdjustMatrixForm):
     MARK = None
     def __init__(self, pois, docs, set_matrix_function):
         super(ReRegisterPointsForm, self).__init__(pois, docs)
+        self.reg_image = PictureBox()
+        self.layout.Controls.Add(self.reg_image, 0, 1)
+        self.layout.SetColumnSpan(self.reg_image, 2)
+        self.reg_image.Visible = False
+        self.reg_image.WaitOnLoad = False
+        self.reg_image.SizeMode = PictureBoxSizeMode.StretchImage
+        self.reg_image.Width = 400
+        self.reg_image.Height = 300
         self.matrix = docs.current_matrix
         self.set_matrix_function = set_matrix_function
     def get_exit_action(self):
         return self.EXIT_KEEP
     def drive(self, poi, count, total_count):
         self.docs.drive_to_poi(poi)
+        if poi.name:
+            self.reg_image.LoadAsync(poi.name)
+            self.reg_image.Visible = True
+        else:
+            self.reg_image.Visible = False
     def stage_position(self):
         return (
             Zen.Devices.Stage.ActualPositionX,
@@ -774,6 +858,8 @@ class RefreshTask(Task):
 
 class PointTask(Task):
     SAVE_MESSAGE = 'Save changes to points?'
+    def save(self):
+        self.docs.save_poi()
     def do(self):
         count = self.adjust_points()
         if count == 0:
@@ -781,21 +867,35 @@ class PointTask(Task):
         window = Zen.Windows.CreateWindow(self.SAVE_MESSAGE)
         window.HasCancelButton = True
         if not window.Show().HasCanceled:
-            self.docs.save_poi()
+            self.save()
 
 class AddPointsTask(PointTask):
+    DONE_IS_SUITABLE = False
     MIN_POINTS = 1
     FORM = AddPoiForm
     def adjust_points(self):
         with self.FORM(self.docs) as form:
             return form.run()
     def recommended(self):
-        pois = self.docs.get_pois(self.FORM.TYPE)
+        sf = suitable_and_not_done
+        if self.DONE_IS_SUITABLE:
+            sf = suitable
+        pois = self.docs.get_pois(
+            type=self.FORM.TYPE,
+            suitability_function=sf
+        )
         return not has_at_least(pois, self.MIN_POINTS)
 
 class AdjustPointsTask(PointTask):
+    DONE_IS_SUITABLE = False
     def get_pois(self):
-        return self.docs.get_pois(self.POI_TYPE)
+        sf = suitable_and_not_done
+        if self.DONE_IS_SUITABLE:
+            sf = suitable
+        return self.docs.get_pois(
+            type=self.POI_TYPE,
+            suitability_function= sf 
+        )
     def is_available(self):
         return has_at_least(self.get_pois(), 1)
     def adjust_points(self):
@@ -820,14 +920,22 @@ class AddRegistrationPointsTask(AddPointsTask):
     MIN_POINTS = 2
     SAVE_MESSAGE = 'Save new registration points?'
     FORM = AddRegistrationPointsForm
+    DONE_IS_SUITABLE = True
     def name(self):
         return 'Add registration points'
+    def save(self):
+        super(AddRegistrationPointsTask, self).save()
+        self.docs.store_registration_point_images()
 
 class AdjustRegistrationPointsTask(AdjustPointsTask):
     SAVE_MESSAGE = 'Save changes to registration points (does not re-register the slide)?'
     POI_TYPE = 'r'
+    DONE_IS_SUITABLE = True
     def name(self):
         return 'Adjust registration points'
+    def save(self):
+        super(AdjustRegistrationPointsTask, self).save()
+        self.docs.store_registration_point_images()
 
 class AddMineralExtentsTask(AddPointsTask):
     MIN_POINTS = 2
@@ -897,7 +1005,7 @@ class NeedFocusTask(Task):
             zen.autofocus(self.EXPERIMENT_NAME, 10)
         except Exception as e:
             zen.show_live(self.EXPERIMENT_NAME)
-            Zen.Application.Pause('Autofocus failed, please focus manually then click OK')
+            Zen.Application.Pause('Autofocus failed, please focus manually then click Continue')
 
 class CreateTiledImageTask(NeedFocusTask):
     REG_SIZE = 50
@@ -915,7 +1023,7 @@ class CreateTiledImageTask(NeedFocusTask):
     def do(self):
         self.user_setup()
         self.get_focused()
-        exp = Zen.Acquisition.Experiments.GetByName(self.EXPERIMENT_NAME)
+        exp = Zen.Acquisition.Experiments.GetByFileName(self.EXPERIMENT_NAME)
         exp.ClearTileRegionsAndPositions(0)
         for ps in self.get_extents():
             (xmin, xmax, ymin, ymax, z) = self.extent_from_pois(ps)
@@ -934,12 +1042,12 @@ class CreateTiledImageTask(NeedFocusTask):
 
 class CreateMineralImageTask(CreateTiledImageTask):
     POI_TYPE = 'x'
-    EXPERIMENT_NAME = 'AcquireStacksTileRL.czexp'
+    EXPERIMENT_NAME = tile_rl_experiment_name
     FILE_NAME = 'minerals.czi'
     EXPERIMENT_NAMES = {
-        'reflected': 'AcquireStacksTileRL.czexp',
-        'transmitted': 'AcquireStacksTileTL.czexp',
-        'circularly polarized': 'AcquireStacksTileCPol.czexp'
+        'reflected': tile_rl_experiment_name,
+        'transmitted': tile_tl_experiment_name,
+        'circularly polarized': tile_cpol_experiment_name
     }
     FILE_NAMES = {
         'reflected': 'mineralsRL.czi',
@@ -967,7 +1075,7 @@ class CreateMineralImageTask(CreateTiledImageTask):
 
 class CreateMicaImageTask(CreateTiledImageTask):
     POI_TYPE = 'm'
-    EXPERIMENT_NAME = 'AcquireStacksTileTL.czexp'
+    EXPERIMENT_NAME = tile_tl_experiment_name
     FILE_NAME = 'mica.czi'
     def name(self):
         return 'Generate mica tiled image'
@@ -1007,7 +1115,7 @@ class ReRegisterPointsTask(RegistrationTask):
     def name(self):
         return 'Re-register (after stage recalibration or slide removal)'
     def get_pois(self):
-        return self.docs.get_pois('r')
+        return self.docs.get_pois('r', suitable)
     def is_available(self):
         return has_at_least(self.get_pois(), 2)
     def do(self):
@@ -1122,7 +1230,7 @@ class ManimalPoiTask(Task):
 
 class MakeMapTask(CreateTiledImageTask):
     POI_TYPE = 'x'
-    EXPERIMENT_NAME = 'AcquireStacksMapTL.czexp'
+    EXPERIMENT_NAME = map_experiment_name
     MAGNIFICATION = 5
     FILE_NAME = 'map.czi'
     def name(self):
@@ -1234,7 +1342,7 @@ class CaptureZStacksTask(NeedFocusTask):
     FILE_PREFIX = ''
     MAX_FAILURES = 3
     EXPERIMENT_NAME = coarse_focus_experiment_name
-    FINE_FOCUS_EXPERIMENT_NAME = rl_experiment_name
+    FINE_FOCUS_EXPERIMENT_NAME = fine_focus_experiment_name
     def poi_is_ok(self, poi):
         return True
     def get_pois(self):
@@ -1352,7 +1460,7 @@ class CaptureMicaZStacksTask(CaptureZStacksTask):
         micaZ =  poi.micaZ
         if micaZ is not None:
             zen.set_focus(micaZ)
-            zen.autofocus(rl_experiment_name)
+            zen.autofocus(fine_focus_experiment_name)
         elif self.focus_estimator.count() &lt; 3:
             Zen.Application.Pause('Please focus manually')
             self.focus_estimator.add(
@@ -1366,7 +1474,7 @@ class CaptureMicaZStacksTask(CaptureZStacksTask):
                 Zen.Devices.Stage.ActualPositionY
             )
             Zen.Devices.Focus.MoveTo(z)
-            zen.autofocus(rl_experiment_name)
+            zen.autofocus(fine_focus_experiment_name)
             self.focus_estimator.add(
                 Zen.Devices.Stage.ActualPositionX,
                 Zen.Devices.Stage.ActualPositionY,
@@ -1451,6 +1559,6 @@ while run_a_task(folder):
   <Author></Author>
   <Description></Description>
   <Keywords></Keywords>
-  <Row>434</Row>
-  <Column>12</Column>
+  <Row>72</Row>
+  <Column>24</Column>
 </Script>
