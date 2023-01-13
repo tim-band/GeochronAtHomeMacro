@@ -363,7 +363,7 @@
             </Calibration>
             <IsHolderEnabled>true</IsHolderEnabled>
             <HolderNumber />
-            <CorrelativeSessionId>d6cb5d5c-ee38-4acc-b27a-e5758fd29727</CorrelativeSessionId>
+            <CorrelativeSessionId>4a6bb60c-2877-48a6-858c-a9480eada97f</CorrelativeSessionId>
           </HolderDocument>
           <SubDimensionSetups />
         </CorrelativeSetup>
@@ -517,17 +517,17 @@
               <SubInterval>1</SubInterval>
             </TimeSeriesIntervalInfo>
             <RegionsIntervalInfo>
-              <IsActivated>true</IsActivated>
+              <IsActivated>false</IsActivated>
               <IsMainIntervalEnabled>true</IsMainIntervalEnabled>
               <IsSubIntervalEnabled>false</IsSubIntervalEnabled>
               <MainInterval>1</MainInterval>
               <SubInterval>1</SubInterval>
             </RegionsIntervalInfo>
             <TilesIntervalInfo>
-              <IsActivated>false</IsActivated>
+              <IsActivated>true</IsActivated>
               <IsMainIntervalEnabled>true</IsMainIntervalEnabled>
               <IsSubIntervalEnabled>false</IsSubIntervalEnabled>
-              <MainInterval>1</MainInterval>
+              <MainInterval>5</MainInterval>
               <SubInterval>1</SubInterval>
             </TilesIntervalInfo>
             <HardwareAutofocusOptions>

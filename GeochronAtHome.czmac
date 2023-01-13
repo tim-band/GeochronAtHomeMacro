@@ -31,16 +31,19 @@
 # Exit
 
 import glob
+import hardware_settings
 import linear
 import math
 import os
 import random
+import shutil
 import subprocess
 import time
 import workarounds
 
-reload(workarounds)
+reload(hardware_settings)
 reload(linear)
+reload(workarounds)
 
 import clr
 
@@ -64,6 +67,17 @@ def resource_location(name):
         name
     )
 
+def copy_experiment(path):
+    dest = os.path.join(
+        Zen.Application.Environment.GetFolderPath(ZenSpecialFolder.UserDocuments),
+        'Experiment Setups',
+        'GeochronAtHome Experiment.czexp'
+    )
+    shutil.copy2(path, dest)
+    exp = Zen.Acquisition.Experiments.GetByFileName(dest)
+    exp.SetActive()
+    return dest
+
 tile_tl_experiment_name = resource_location('TileTL.czexp')
 tile_rl_experiment_name = resource_location('TileRL.czexp')
 tile_cpol_experiment_name = resource_location('TileCPol.czexp')
@@ -71,10 +85,25 @@ fine_focus_experiment_name = resource_location('FocusRL.czexp')
 coarse_focus_experiment_name = resource_location('FocusRLCoarse.czexp')
 map_experiment_name = resource_location('MapTL.czexp')
 
-# For some reason, hardware settings don't work in other directories
-hs_reflected = 'Reflected'
-hs_transmitted = 'Transmitted'
-camera_setting = '100ms'
+camera_setting = ZenCameraSetting()
+camera_setting.SetParameter("AnalogGainModeList", 0)
+camera_setting.SetParameter("WhiteBalance", "0.661,1,0.407")
+camera_setting.SetParameter("WhiteBalanceOffset", 0)
+camera_setting.SetParameter("ColorSaturation", 0.5)
+
+def setExposureTime(ms):
+    camera_setting.SetParameter("ExposureTime", ms)
+    Zen.Acquisition.ActiveCamera.ApplyCameraSetting(camera_setting)
+
+def makeHardwareSetting(name):
+    hs = ZenHardwareSetting()
+    for (id, ps) in hardware_settings.settings[name].items():
+        for (param, value) in ps.items():
+            hs.SetParameter(id, param, value)
+    return hs
+
+hs_reflected = makeHardwareSetting('reflected')
+hs_transmitted = makeHardwareSetting('transmitted')
 
 class UserCancelledException(Exception):
     pass
@@ -441,9 +470,12 @@ class Documents(object):
     def all_pois(self):
         for i in range(self.poi.RowCount):
             yield Poi(self.poi, i)
-    def drive_to_xyz(self, x, y, **kwargs):
+    def project_to_stage(self, x, y):
         if self.current_matrix:
-            (x,y) = linear.transform(self.current_matrix, x, y)
+            return linear.transform(self.current_matrix, x, y)
+        return (x, y)
+    def drive_to_xyz(self, x, y, **kwargs):
+        (x,y) = self.project_to_stage(x, y)
         zen.move_stage(x, y, **kwargs)
     def drive_to_poi(self, p):
         self.drive_to_xyz(p.x, p.y, z=p.z)
@@ -464,9 +496,7 @@ class Documents(object):
         """
         returns the POI's position in stage coordinates
         """
-        if self.current_matrix:
-            return linear.transform(self.current_matrix, p.x, p.y)
-        return (p.x, p.y)
+        return self.project_to_stage(p.x, p.y)
     def poi_mica_position(self, p):
         """
         returns the POI's mica position in project coordinates
@@ -532,7 +562,7 @@ class Documents(object):
             arrow1.X2 = cx - 50
             arrow1.Y1 = cy
             arrow1.Y2 = cy
-            arrow1.Thickness = 3
+            arrow1.Thickness = 7
             arrow1.StrokeColor = ZenColors.Red
             arrow1.IsMeasurementVisible = False
             arrow1.RotationAngle = 0
@@ -541,7 +571,7 @@ class Documents(object):
             arrow2.X2 = cx
             arrow2.Y1 = cy - 250
             arrow2.Y2 = cy - 50
-            arrow2.Thickness = 3
+            arrow2.Thickness = 7
             arrow2.StrokeColor = ZenColors.Red
             arrow2.IsMeasurementVisible = False
             arrow2.RotationAngle = 0
@@ -556,11 +586,12 @@ class Documents(object):
 
 class AdjustPoiForm(AdjustForm):
     HARDWARE_SETTING = hs_transmitted
-    CAMERA_SETTING = camera_setting
+    EXPOSURE_TIME_MS = 25
     def __init__(self, pois, docs):
         super(AdjustPoiForm, self).__init__(pois)
         self.docs = docs
-        zen.set_hardware(self.HARDWARE_SETTING, self.CAMERA_SETTING)
+        zen.set_hardware(self.HARDWARE_SETTING)
+        setExposureTime(self.EXPOSURE_TIME_MS)
     def drive(self, poi, count, total_count):
         self.docs.drive_to_poi(poi)
     def do_adjust(self, poi):
@@ -576,13 +607,14 @@ class AdjustMatrixForm(AdjustForm):
     EXIT_KEEP = 'exit, ignoring remaining points'
     EXIT_MARK_ALL = 'exit and mark remaining POIs as unsuitable'
     HARDWARE_SETTING = hs_transmitted
-    CAMERA_SETTING = camera_setting
+    EXPOSURE_TIME_MS = 25
     FLIP = 1
     def __init__(self, pois, docs):
         super(AdjustMatrixForm, self).__init__(pois)
         self.docs = docs
         self.adjustments = []
-        zen.set_hardware(self.HARDWARE_SETTING, self.CAMERA_SETTING)
+        zen.set_hardware(self.HARDWARE_SETTING)
+        setExposureTime(self.EXPOSURE_TIME_MS)
     def transform_point(self, x, y):
         return (x,y)
     def drive(self, poi, count, total_count):
@@ -978,12 +1010,12 @@ class NeedFocusTask(Task):
         return self.docs.get_pois(self.POI_TYPE)
     def extent_from_pois(self, pois):
         ps = list(pois)
-        (xmin, ymin) = self.docs.stage_position_of_poi(ps[0])
-        xmax = xmin
-        ymax = ymin
+        xmax = xmin = ps[0].x
+        ymax = ymin = ps[0].y
         z = ps[0].z
         for p in ps[1:]:
-            (x, y) = self.docs.stage_position_of_poi(p)
+            x = p.x
+            y = p.y
             if x &lt; xmin:
                 xmin = x
             elif xmax &lt; x:
@@ -1023,10 +1055,13 @@ class CreateTiledImageTask(NeedFocusTask):
     def do(self):
         self.user_setup()
         self.get_focused()
-        exp = Zen.Acquisition.Experiments.GetByFileName(self.EXPERIMENT_NAME)
+        exp_file = copy_experiment(self.EXPERIMENT_NAME)
+        exp = Zen.Acquisition.Experiments.GetByFileName(exp_file)
         exp.ClearTileRegionsAndPositions(0)
         for ps in self.get_extents():
-            (xmin, xmax, ymin, ymax, z) = self.extent_from_pois(ps)
+            (xmin_proj, xmax_proj, ymin_proj, ymax_proj, z) = self.extent_from_pois(ps)
+            (xmin, ymin) = self.docs.project_to_stage(xmin_proj, ymin_proj)
+            (xmax, ymax) = self.docs.project_to_stage(xmax_proj, ymax_proj)
             w = xmax - xmin
             h = ymax - ymin
             exp.AddRectangleTileRegion(0, xmin + w/2, ymin + h/2, w, h, z)
@@ -1039,6 +1074,7 @@ class CreateTiledImageTask(NeedFocusTask):
         tiles.Close()
         exp.ClearTileRegionsAndPositions(0)
         zen.discard_changes(exp)
+        os.unlink(exp_file)
 
 class CreateMineralImageTask(CreateTiledImageTask):
     POI_TYPE = 'x'
@@ -1301,13 +1337,14 @@ def acquire_stack(parameters, folder, prefix=''):
     tl_slice_end = parameters['tl_slice_below']
     tl_interval = parameters['tl_interval']
     focus = Zen.Devices.Focus.ActualPosition
-    zen.set_hardware(camera_setting=camera_setting)
-    zen.set_hardware(hs_reflected, camera_setting)
+    zen.set_hardware(hs_reflected)
+    setExposureTime(100)
     for i in range(rl_slice_start, rl_slice_end):
         Zen.Devices.Focus.MoveTo(focus + i * rl_interval)
         im = Zen.Acquisition.AcquireImage()
         im.Save(os.path.join(folder, "{1}ReflStack-{0:02d}.jpg".format(i, prefix)), 80)
-    zen.set_hardware(hs_transmitted, camera_setting)
+    zen.set_hardware(hs_transmitted)
+    setExposureTime(100)
     for i in range(tl_slice_start, tl_slice_end):
         Zen.Devices.Focus.MoveTo(focus + i * tl_interval)
         im = Zen.Acquisition.AcquireImage()
@@ -1559,6 +1596,6 @@ while run_a_task(folder):
   <Author></Author>
   <Description></Description>
   <Keywords></Keywords>
-  <Row>72</Row>
-  <Column>24</Column>
+  <Row>1059</Row>
+  <Column>59</Column>
 </Script>

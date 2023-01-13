@@ -48,7 +48,7 @@
         <RegionsSetup IsActivated="true">
           <SampleHolder>
             <Overlap>0.1</Overlap>
-            <ScanMode>Comb</ScanMode>
+            <ScanMode>Meander</ScanMode>
             <PositionedRegionsScanMode>FirstYThenX</PositionedRegionsScanMode>
             <TemplateShapesScanMode>Meander</TemplateShapesScanMode>
             <IsConstantTiles>false</IsConstantTiles>
@@ -81,8 +81,8 @@
             <UsedSurfaceFitTypeName></UsedSurfaceFitTypeName>
             <DelayAfterStageMove>0</DelayAfterStageMove>
             <TileDimension>
-              <Width>249.8816</Width>
-              <Height>200.4864</Height>
+              <Width>1249.408</Width>
+              <Height>1002.432</Height>
               <CenterOffsetX>0</CenterOffsetX>
               <CenterOffsetY>0</CenterOffsetY>
             </TileDimension>
@@ -352,7 +352,7 @@
             </Calibration>
             <IsHolderEnabled>true</IsHolderEnabled>
             <HolderNumber />
-            <CorrelativeSessionId>47a15f29-25d2-4907-ba99-38f7b1325ea0</CorrelativeSessionId>
+            <CorrelativeSessionId>4a6bb60c-2877-48a6-858c-a9480eada97f</CorrelativeSessionId>
           </HolderDocument>
           <SubDimensionSetups />
         </CorrelativeSetup>
@@ -547,7 +547,7 @@
               <DY>1</DY>
             </AutofocusRegion>
             <BacklashStepsize>2</BacklashStepsize>
-            <DepthOfFocus>1.22</DepthOfFocus>
+            <DepthOfFocus>12.45</DepthOfFocus>
             <DoBleachingCorrection>true</DoBleachingCorrection>
             <InitialDirection>0</InitialDirection>
             <IsAutomaticRange>false</IsAutomaticRange>
