@@ -18,11 +18,17 @@ class Workarounds:
         self.zen = zen
         self.zeiss = zeiss
         self.backlash = -5
+        self.duck_z = 1000
 
     def move_stage(self, x=None, y=None, z=None):
         """
-        Move the stage and/or focus with backlash correction
+        Move the stage and/or focus with backlash correction,
+        and trying not to crash sideways into things
         """
+        if z != None:
+            current_z = self.zen.Devices.Focus.ActualPosition
+            go_z = min(current_z, z) - self.duck_z
+            self.zen.Devices.Focus.MoveTo(go_z)
         if x != None or y != None:
             if x == None:
                 x = self.zen.Devices.Stage.ActualPositionX

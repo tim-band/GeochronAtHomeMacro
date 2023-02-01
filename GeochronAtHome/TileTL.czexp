@@ -81,8 +81,8 @@
             <UsedSurfaceFitTypeName></UsedSurfaceFitTypeName>
             <DelayAfterStageMove>0</DelayAfterStageMove>
             <TileDimension>
-              <Width>1249.408</Width>
-              <Height>1002.432</Height>
+              <Width>249.8816</Width>
+              <Height>200.4864</Height>
               <CenterOffsetX>0</CenterOffsetX>
               <CenterOffsetY>0</CenterOffsetY>
             </TileDimension>
@@ -133,7 +133,7 @@
                           <CameraFrameSetup Id="MTBCamera_MTBTube_Cameraport.Axiocam506c">
                             <ShadingReference IsActivated="true">false</ShadingReference>
                             <ShadingReferenceSource IsActivated="true">1</ShadingReferenceSource>
-                            <ExposureTime Status="Valid" IsActivated="true">5</ExposureTime>
+                            <ExposureTime Status="Valid" IsActivated="true">100</ExposureTime>
                             <Adjust Status="Valid" IsActivated="true">0.7</Adjust>
                             <AutoExposure Status="Valid" IsActivated="true">false</AutoExposure>
                           </CameraFrameSetup>
@@ -363,7 +363,7 @@
             </Calibration>
             <IsHolderEnabled>true</IsHolderEnabled>
             <HolderNumber />
-            <CorrelativeSessionId>4a6bb60c-2877-48a6-858c-a9480eada97f</CorrelativeSessionId>
+            <CorrelativeSessionId>e9e8f854-5c81-400c-bceb-bbe132976782</CorrelativeSessionId>
           </HolderDocument>
           <SubDimensionSetups />
         </CorrelativeSetup>
@@ -375,7 +375,7 @@
             <Detector Id="MTBCamera_MTBTube_Cameraport.Axiocam506c">
               <ApplyCameraProfile Status="Valid">false</ApplyCameraProfile>
               <ApplyImageOrientation Status="Valid">true</ApplyImageOrientation>
-              <ExposureTime Status="Valid">5</ExposureTime>
+              <ExposureTime Status="Valid">100</ExposureTime>
               <Frame Status="Valid">0,0,2752,2208</Frame>
               <ImageOrientation Status="Valid">1</ImageOrientation>
               <ContinuousAcquisitionSafeMode Status="Valid">true</ContinuousAcquisitionSafeMode>
@@ -527,7 +527,7 @@
               <IsActivated>true</IsActivated>
               <IsMainIntervalEnabled>true</IsMainIntervalEnabled>
               <IsSubIntervalEnabled>false</IsSubIntervalEnabled>
-              <MainInterval>5</MainInterval>
+              <MainInterval>1</MainInterval>
               <SubInterval>1</SubInterval>
             </TilesIntervalInfo>
             <HardwareAutofocusOptions>
@@ -558,7 +558,7 @@
               <DY>1</DY>
             </AutofocusRegion>
             <BacklashStepsize>2</BacklashStepsize>
-            <DepthOfFocus>12.45</DepthOfFocus>
+            <DepthOfFocus>1.22</DepthOfFocus>
             <DoBleachingCorrection>true</DoBleachingCorrection>
             <InitialDirection>0</InitialDirection>
             <IsAutomaticRange>false</IsAutomaticRange>

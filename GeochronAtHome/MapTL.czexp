@@ -133,7 +133,7 @@
                           <CameraFrameSetup Id="MTBCamera_MTBTube_Cameraport.Axiocam506c">
                             <ShadingReference IsActivated="true">false</ShadingReference>
                             <ShadingReferenceSource IsActivated="true">1</ShadingReferenceSource>
-                            <ExposureTime Status="Valid" IsActivated="true">24</ExposureTime>
+                            <ExposureTime Status="Valid" IsActivated="true">100</ExposureTime>
                             <Adjust Status="Valid" IsActivated="true">0.7</Adjust>
                             <AutoExposure Status="Valid" IsActivated="true">false</AutoExposure>
                           </CameraFrameSetup>
@@ -363,7 +363,7 @@
             </Calibration>
             <IsHolderEnabled>true</IsHolderEnabled>
             <HolderNumber />
-            <CorrelativeSessionId>c0e6e3cd-0bad-4fa2-9ed1-d46739975fc5</CorrelativeSessionId>
+            <CorrelativeSessionId>a652912c-731c-4502-9d08-033553c8f93e</CorrelativeSessionId>
           </HolderDocument>
           <SubDimensionSetups />
         </CorrelativeSetup>
