@@ -363,7 +363,7 @@
             </Calibration>
             <IsHolderEnabled>true</IsHolderEnabled>
             <HolderNumber />
-            <CorrelativeSessionId>4a6bb60c-2877-48a6-858c-a9480eada97f</CorrelativeSessionId>
+            <CorrelativeSessionId>a260198a-6956-48aa-9ac0-b4e25d1f4ec8</CorrelativeSessionId>
           </HolderDocument>
           <SubDimensionSetups />
         </CorrelativeSetup>
@@ -701,7 +701,7 @@
       </ParameterCollection>
       <ParameterCollection Id="MTBTLHalogenLamp">
         <LampMode Status="Valid" IsActivated="true">Manual</LampMode>
-        <Intensity Status="Valid" IsActivated="true">83.859649122807</Intensity>
+        <Intensity Status="Valid" IsActivated="true">45.216859301885</Intensity>
       </ParameterCollection>
       <ParameterCollection Id="MTBRLTLSwitch">
         <PositionName Status="Valid" IsActivated="true">RLTLSwitch.TL</PositionName>

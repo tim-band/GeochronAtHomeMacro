@@ -18,33 +18,42 @@ class Workarounds:
         self.zen = zen
         self.zeiss = zeiss
         self.backlash = -5
-        self.duck_z = 1000
+        self.duck_z = 500
+        self.max_move_without_ducking = 500
 
     def move_stage(self, x=None, y=None, z=None):
         """
         Move the stage and/or focus with backlash correction,
         and trying not to crash sideways into things
         """
-        if z != None:
-            current_z = self.zen.Devices.Focus.ActualPosition
-            go_z = min(current_z, z) - self.duck_z
-            self.zen.Devices.Focus.MoveTo(go_z)
-        if x != None or y != None:
-            if x == None:
-                x = self.zen.Devices.Stage.ActualPositionX
-                xb = x
-            else:
-                xb = x + self.backlash
-            if y == None:
-                y = self.zen.Devices.Stage.ActualPositionY
-                yb = y
-            else:
-                yb = y + self.backlash
-            self.zen.Devices.Stage.MoveTo(xb, yb)
-            self.zen.Devices.Stage.MoveTo(x, y)
-        if z != None:
-            self.zen.Devices.Focus.MoveTo(z + self.backlash)
-            self.zen.Devices.Focus.MoveTo(z)
+        current_x = self.zen.Devices.Stage.ActualPositionX
+        current_y = self.zen.Devices.Stage.ActualPositionY
+        current_z = self.zen.Devices.Focus.ActualPosition
+        if z == None:
+            z = current_z
+            zb = z
+            minz = z
+        else:
+            minz = min(current_z, z)
+            zb = minz - abs(self.backlash)
+        if x == None:
+            x = current_x
+            xb = x
+        else:
+            xb = x + self.backlash
+            if self.max_move_without_ducking < abs(x - current_x):
+                zb = minz - self.duck_z
+        if y == None:
+            y = current_y
+            yb = y
+        else:
+            yb = y + self.backlash
+            if self.max_move_without_ducking < abs(y - current_y):
+                zb = minz - self.duck_z
+        self.zen.Devices.Focus.MoveTo(zb)
+        self.zen.Devices.Stage.MoveTo(xb, yb)
+        self.zen.Devices.Stage.MoveTo(x, y)
+        self.zen.Devices.Focus.MoveTo(z)
 
     def set_focus(self, z):
         self.move_stage(z=z)

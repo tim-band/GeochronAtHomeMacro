@@ -81,8 +81,8 @@
             <UsedSurfaceFitTypeName></UsedSurfaceFitTypeName>
             <DelayAfterStageMove>0</DelayAfterStageMove>
             <TileDimension>
-              <Width>249.8816</Width>
-              <Height>200.4864</Height>
+              <Width>1249.408</Width>
+              <Height>1002.432</Height>
               <CenterOffsetX>0</CenterOffsetX>
               <CenterOffsetY>0</CenterOffsetY>
             </TileDimension>
@@ -363,7 +363,7 @@
             </Calibration>
             <IsHolderEnabled>true</IsHolderEnabled>
             <HolderNumber />
-            <CorrelativeSessionId>e9e8f854-5c81-400c-bceb-bbe132976782</CorrelativeSessionId>
+            <CorrelativeSessionId>a260198a-6956-48aa-9ac0-b4e25d1f4ec8</CorrelativeSessionId>
           </HolderDocument>
           <SubDimensionSetups />
         </CorrelativeSetup>
@@ -558,7 +558,7 @@
               <DY>1</DY>
             </AutofocusRegion>
             <BacklashStepsize>2</BacklashStepsize>
-            <DepthOfFocus>1.22</DepthOfFocus>
+            <DepthOfFocus>12.45</DepthOfFocus>
             <DoBleachingCorrection>true</DoBleachingCorrection>
             <InitialDirection>0</InitialDirection>
             <IsAutomaticRange>false</IsAutomaticRange>
@@ -660,7 +660,7 @@
     <HardwareSetting Name="AcquireStacksTransmitted">
       <ParameterCollection Id="MTBTLHalogenLamp">
         <LampMode Status="Valid" IsActivated="true">Manual</LampMode>
-        <Intensity Status="Valid" IsActivated="true">26.023391812866</Intensity>
+        <Intensity Status="Valid" IsActivated="true">11.885785780821</Intensity>
       </ParameterCollection>
       <ParameterCollection Id="MTBRLHalogenLamp">
         <LampMode Status="Valid" IsActivated="true">Standby</LampMode>

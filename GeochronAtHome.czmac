@@ -68,12 +68,14 @@ def resource_location(name):
     )
 
 def copy_experiment(path):
+    Zen.Application.LeftToolArea.SwitchToTab(ZenToolTab.LocateTab)
     dest = os.path.join(
         Zen.Application.Environment.GetFolderPath(ZenSpecialFolder.UserDocuments),
         'Experiment Setups',
         'GeochronAtHome Experiment.czexp'
     )
     shutil.copy2(path, dest)
+    Zen.Application.LeftToolArea.SwitchToTab(ZenToolTab.AcquisitionTab)
     exp = Zen.Acquisition.Experiments.GetByFileName(dest)
     exp.SetActive()
     return dest
@@ -586,7 +588,7 @@ class Documents(object):
 
 class AdjustPoiForm(AdjustForm):
     HARDWARE_SETTING = hs_transmitted
-    EXPOSURE_TIME_MS = 25
+    EXPOSURE_TIME_MS = 100
     def __init__(self, pois, docs):
         super(AdjustPoiForm, self).__init__(pois)
         self.docs = docs
@@ -607,7 +609,7 @@ class AdjustMatrixForm(AdjustForm):
     EXIT_KEEP = 'exit, ignoring remaining points'
     EXIT_MARK_ALL = 'exit and mark remaining POIs as unsuitable'
     HARDWARE_SETTING = hs_transmitted
-    EXPOSURE_TIME_MS = 25
+    EXPOSURE_TIME_MS = 100
     FLIP = 1
     def __init__(self, pois, docs):
         super(AdjustMatrixForm, self).__init__(pois)
@@ -667,12 +669,37 @@ class AdjustMicaMatrixForm(AdjustMatrixForm):
         rbounds = rotated.Bounds
         startX = (rbounds.SizeX - mbounds.SizeX) / 2
         startY = (rbounds.SizeY - mbounds.SizeY) / 2
-        self.rotated_grain = rotated.CreateSubImage('X({0}-{1})|Y({2}-{3})'.format(
+        cropped = rotated.CreateSubImage('X({0}-{1})|Y({2}-{3})'.format(
             startX,
             startX + mbounds.SizeX - 1,
             startY,
             startY + mbounds.SizeY - 1
         ))
+        cx = mbounds.SizeX / 2
+        cy = mbounds.SizeY / 2
+        hline = cropped.Graphics.Add(ZenGraphicCategory.Line)
+        hline.X1 = cx - 300
+        hline.X2 = cx + 300
+        hline.Y1 = cy
+        hline.Y2 = cy
+        hline.Thickness = 2
+        hline.StrokeColor = ZenColors.Blue
+        hline.IsMeasurementVisible = False
+        hline.RotationAngle = 0
+        vline = cropped.Graphics.Add(ZenGraphicCategory.Line)
+        vline.X1 = cx
+        vline.X2 = cx
+        vline.Y1 = cy - 300
+        vline.Y2 = cy + 300
+        vline.Thickness = 2
+        vline.StrokeColor = ZenColors.Blue
+        vline.IsMeasurementVisible = False
+        vline.RotationAngle = 0
+        circle = cropped.Graphics.Add(ZenGraphicCategory.Circle)
+        circle.SetBounds(cx - 150, cy - 150, 300, 300)
+        circle.Thickness = 4.3
+        circle.StrokeColor = ZenColors.Blue
+        self.rotated_grain = cropped.BurnInGraphics()
         Zen.Application.Documents.Add(self.rotated_grain)
         zen.show_live()
         super(AdjustMicaMatrixForm, self).drive(poi, count, total_count)
@@ -1607,6 +1634,6 @@ while run_a_task(folder):
   <Author></Author>
   <Description></Description>
   <Keywords></Keywords>
-  <Row>1406</Row>
-  <Column>1</Column>
+  <Row>695</Row>
+  <Column>31</Column>
 </Script>
