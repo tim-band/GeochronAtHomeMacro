@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <HardwareExperiment Version="1.2">
   <RunMode>PreventFocusRestoreAfterExperiment,PreventStageXYRestoreAfterExperiment,PreventLightAndContrastManagerDeactivation</RunMode>
-  <BeforeHardwareSetting></BeforeHardwareSetting>
+  <BeforeHardwareSetting>ActualHardware1 - Before</BeforeHardwareSetting>
   <AfterHardwareSetting></AfterHardwareSetting>
   <ExperimentBlockIndex>0</ExperimentBlockIndex>
   <IsSegmented>false</IsSegmented>
@@ -109,7 +109,7 @@
                     <DetectionModeSetup>
                       <Zeiss.Micro.Acquisition.WfTrackDetectionMode />
                     </DetectionModeSetup>
-                    <BeforeHardwareSetting>AcquireStacksTransmitted</BeforeHardwareSetting>
+                    <BeforeHardwareSetting></BeforeHardwareSetting>
                     <AfterHardwareSetting></AfterHardwareSetting>
                     <TrackName></TrackName>
                     <Channels>
@@ -363,7 +363,7 @@
             </Calibration>
             <IsHolderEnabled>true</IsHolderEnabled>
             <HolderNumber />
-            <CorrelativeSessionId>a260198a-6956-48aa-9ac0-b4e25d1f4ec8</CorrelativeSessionId>
+            <CorrelativeSessionId>31b35998-cd3f-4db0-a96e-15237e20cfb4</CorrelativeSessionId>
           </HolderDocument>
           <SubDimensionSetups />
         </CorrelativeSetup>
@@ -405,7 +405,7 @@
               <Adjust Status="Valid">0.7</Adjust>
               <AdjustFrameRate Status="Valid">true</AdjustFrameRate>
               <AutoExposure Status="Valid">false</AutoExposure>
-              <AutoExposureFrame Status="Valid">Empty</AutoExposureFrame>
+              <AutoExposureFrame Status="Valid">803,560,1147,1087</AutoExposureFrame>
               <Binning Status="Valid">1,1</Binning>
               <BlackReference Status="Valid">false</BlackReference>
               <DefaultDisplayGamma Status="Valid">0.45</DefaultDisplayGamma>
@@ -493,7 +493,7 @@
         <FocusSetup IsActivated="true">
           <RepetitionSettingsMode>Expert</RepetitionSettingsMode>
           <FocusStrategy IsActivated="true">
-            <StrategyMode>SoftwareAutofocus</StrategyMode>
+            <StrategyMode>LocalFocusSurface</StrategyMode>
             <ReferenceChannelId>637666231721426409</ReferenceChannelId>
             <FixedZPosition>0</FixedZPosition>
             <UseZPositionFromTilesSetup>true</UseZPositionFromTilesSetup>
@@ -524,7 +524,7 @@
               <SubInterval>1</SubInterval>
             </RegionsIntervalInfo>
             <TilesIntervalInfo>
-              <IsActivated>true</IsActivated>
+              <IsActivated>false</IsActivated>
               <IsMainIntervalEnabled>true</IsMainIntervalEnabled>
               <IsSubIntervalEnabled>false</IsSubIntervalEnabled>
               <MainInterval>1</MainInterval>
@@ -552,10 +552,10 @@
             <ReflectionMode>Disabled</ReflectionMode>
             <ReflectionModeOffset>-120</ReflectionModeOffset>
             <AutofocusRegion>
-              <X>0</X>
-              <Y>0</Y>
-              <DX>1</DX>
-              <DY>1</DY>
+              <X>0.29178779069767441</X>
+              <Y>0.25362318840579712</Y>
+              <DX>0.41678779069767441</DX>
+              <DY>0.49230072463768115</DY>
             </AutofocusRegion>
             <BacklashStepsize>2</BacklashStepsize>
             <DepthOfFocus>12.45</DepthOfFocus>
@@ -586,7 +586,7 @@
               </SharpnessMeasure>
             </SharpnessMeasureSet>
             <UpperLimit>-100</UpperLimit>
-            <UseAcquisitionROI>true</UseAcquisitionROI>
+            <UseAcquisitionROI>false</UseAcquisitionROI>
             <UseCameraParameters>false</UseCameraParameters>
             <UseChannelInformation>true</UseChannelInformation>
             <IsLiveAnalysisReportingEnabled>false</IsLiveAnalysisReportingEnabled>
@@ -657,25 +657,26 @@
     </AcquisitionBlock>
   </ExperimentBlocks>
   <HardwareSettingsPool>
-    <HardwareSetting Name="AcquireStacksTransmitted">
-      <ParameterCollection Id="MTBTLHalogenLamp">
-        <LampMode Status="Valid" IsActivated="true">Manual</LampMode>
-        <Intensity Status="Valid" IsActivated="true">11.885785780821</Intensity>
+    <HardwareSetting Name="ActualHardware1 - Before">
+      <ParameterCollection Id="MTBReflectorChanger">
+        <Position Status="Valid" IsActivated="true">5</Position>
+        <PositionName Status="Valid" IsActivated="true">Reflector.none</PositionName>
       </ParameterCollection>
       <ParameterCollection Id="MTBRLHalogenLamp">
-        <LampMode Status="Valid" IsActivated="true">Standby</LampMode>
         <Intensity Status="Valid" IsActivated="true">0</Intensity>
+        <LampMode Status="Valid" IsActivated="true">Standby</LampMode>
       </ParameterCollection>
       <ParameterCollection Id="MTBRLShutter">
+        <PositionName Status="Valid" IsActivated="true">Shutter.Closed</PositionName>
         <IsClosed Status="Valid" IsActivated="true">true</IsClosed>
       </ParameterCollection>
-      <ParameterCollection Id="MTBReflectorChanger">
-        <PositionName Status="Valid" IsActivated="true">Reflector.none</PositionName>
-        <Position Status="Valid" IsActivated="true">5</Position>
-      </ParameterCollection>
       <ParameterCollection Id="MTBRLTLSwitch">
-        <PositionName Status="Valid" IsActivated="true">RLTLSwitch.TL</PositionName>
         <Position Status="Valid" IsActivated="true">1</Position>
+        <PositionName Status="Valid" IsActivated="true">RLTLSwitch.TL</PositionName>
+      </ParameterCollection>
+      <ParameterCollection Id="MTBTLHalogenLamp">
+        <Intensity Status="Valid" IsActivated="true">11.196983977383</Intensity>
+        <LampMode Status="Valid" IsActivated="true">Manual</LampMode>
       </ParameterCollection>
     </HardwareSetting>
   </HardwareSettingsPool>

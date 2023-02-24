@@ -81,8 +81,8 @@
             <UsedSurfaceFitTypeName></UsedSurfaceFitTypeName>
             <DelayAfterStageMove>0</DelayAfterStageMove>
             <TileDimension>
-              <Width>249.8816</Width>
-              <Height>200.4864</Height>
+              <Width>124.9408</Width>
+              <Height>100.2432</Height>
               <CenterOffsetX>0</CenterOffsetX>
               <CenterOffsetY>0</CenterOffsetY>
             </TileDimension>
@@ -134,7 +134,7 @@
                           <ContrastMethods>ReflectedLightFluorescence</ContrastMethods>
                           <ContrastTypes>Unknown</ContrastTypes>
                           <Color>#FFD3D3D3</Color>
-                          <dye_id>Dye348222F2</dye_id>
+                          <dye_id>Dye58E9B5A6</dye_id>
                           <collection_id>00000000-0000-0000-0000-000000000000</collection_id>
                         </FluorescenceDye>
                       </Channel>
@@ -353,7 +353,7 @@
             </Calibration>
             <IsHolderEnabled>true</IsHolderEnabled>
             <HolderNumber />
-            <CorrelativeSessionId>0b9fdcf2-1d65-48b4-a622-22e073f04eef</CorrelativeSessionId>
+            <CorrelativeSessionId>6e58abe6-b522-476c-a5af-7fdb71348629</CorrelativeSessionId>
           </HolderDocument>
           <SubDimensionSetups />
         </CorrelativeSetup>
@@ -395,7 +395,7 @@
               <Adjust Status="Valid">0.7</Adjust>
               <AdjustFrameRate Status="Valid">true</AdjustFrameRate>
               <AutoExposure Status="Valid">false</AutoExposure>
-              <AutoExposureFrame Status="Valid">800,562,1147,1087</AutoExposureFrame>
+              <AutoExposureFrame Status="Valid">794,589,1147,1087</AutoExposureFrame>
               <Binning Status="Valid">1,1</Binning>
               <BlackReference Status="Valid">false</BlackReference>
               <DefaultDisplayGamma Status="Valid">0.45</DefaultDisplayGamma>
@@ -542,13 +542,13 @@
             <ReflectionMode>Disabled</ReflectionMode>
             <ReflectionModeOffset>-120</ReflectionModeOffset>
             <AutofocusRegion>
-              <X>0.29069767441860467</X>
-              <Y>0.2545289855072464</Y>
+              <X>0.28851744186046513</X>
+              <Y>0.26675724637681159</Y>
               <DX>0.41678779069767441</DX>
               <DY>0.49230072463768115</DY>
             </AutofocusRegion>
             <BacklashStepsize>2</BacklashStepsize>
-            <DepthOfFocus>0.44</DepthOfFocus>
+            <DepthOfFocus>0.35</DepthOfFocus>
             <DoBleachingCorrection>true</DoBleachingCorrection>
             <InitialDirection>0</InitialDirection>
             <IsAutomaticRange>false</IsAutomaticRange>
@@ -649,14 +649,14 @@
   <HardwareSettingsPool>
     <HardwareSetting Name="Reflected">
       <ParameterCollection Id="MTBRLHalogenLamp">
-        <LampMode Status="Valid" IsActivated="true">Manual</LampMode>
-        <Intensity Status="Valid" IsActivated="true">29.53216374269</Intensity>
+        <LampMode Status="Valid" IsActivated="true">Set3200K</LampMode>
+        <Intensity Status="Valid" IsActivated="true">80</Intensity>
       </ParameterCollection>
       <ParameterCollection Id="MTBRLShutter">
         <IsClosed Status="Valid" IsActivated="true">false</IsClosed>
       </ParameterCollection>
       <ParameterCollection Id="MTBRLApertureStop">
-        <Position Status="Valid" IsActivated="true" Unit="%">33.0550918197</Position>
+        <Position Status="Valid" IsActivated="true" Unit="%">0</Position>
       </ParameterCollection>
       <ParameterCollection Id="MTBTLHalogenLamp">
         <LampMode Status="Valid" IsActivated="true">Standby</LampMode>
@@ -680,10 +680,6 @@
       <ParameterCollection Id="MTBRLFilterChanger2">
         <PositionName Status="Valid" IsActivated="true">ND 100</PositionName>
         <Position Status="Valid" IsActivated="true">1</Position>
-      </ParameterCollection>
-      <ParameterCollection Id="MTBObjectiveChanger">
-        <PositionName Status="Valid" IsActivated="true">Objective.422372-9901-000</PositionName>
-        <Position Status="Valid" IsActivated="true">4</Position>
       </ParameterCollection>
     </HardwareSetting>
   </HardwareSettingsPool>

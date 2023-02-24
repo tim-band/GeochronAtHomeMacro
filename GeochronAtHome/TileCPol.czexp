@@ -1,8 +1,8 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <HardwareExperiment Version="1.2">
   <RunMode>PreventFocusRestoreAfterExperiment,PreventStageXYRestoreAfterExperiment,PreventLightAndContrastManagerDeactivation</RunMode>
-  <BeforeHardwareSetting></BeforeHardwareSetting>
-  <AfterHardwareSetting></AfterHardwareSetting>
+  <BeforeHardwareSetting>Before Exp [cPol] Smart</BeforeHardwareSetting>
+  <AfterHardwareSetting>After Exp [cPol] Smart</AfterHardwareSetting>
   <ExperimentBlockIndex>0</ExperimentBlockIndex>
   <IsSegmented>false</IsSegmented>
   <IsStandardMode>true</IsStandardMode>
@@ -109,7 +109,7 @@
                     <DetectionModeSetup>
                       <Zeiss.Micro.Acquisition.WfTrackDetectionMode />
                     </DetectionModeSetup>
-                    <BeforeHardwareSetting>AcquireStacksPolarized</BeforeHardwareSetting>
+                    <BeforeHardwareSetting></BeforeHardwareSetting>
                     <AfterHardwareSetting></AfterHardwareSetting>
                     <TrackName></TrackName>
                     <Channels>
@@ -363,7 +363,7 @@
             </Calibration>
             <IsHolderEnabled>true</IsHolderEnabled>
             <HolderNumber />
-            <CorrelativeSessionId>a260198a-6956-48aa-9ac0-b4e25d1f4ec8</CorrelativeSessionId>
+            <CorrelativeSessionId>31b35998-cd3f-4db0-a96e-15237e20cfb4</CorrelativeSessionId>
           </HolderDocument>
           <SubDimensionSetups />
         </CorrelativeSetup>
@@ -493,7 +493,7 @@
         <FocusSetup IsActivated="true">
           <RepetitionSettingsMode>Expert</RepetitionSettingsMode>
           <FocusStrategy IsActivated="true">
-            <StrategyMode>SoftwareAutofocus</StrategyMode>
+            <StrategyMode>LocalFocusSurface</StrategyMode>
             <ReferenceChannelId>637666231721426409</ReferenceChannelId>
             <FixedZPosition>0</FixedZPosition>
             <UseZPositionFromTilesSetup>true</UseZPositionFromTilesSetup>
@@ -524,7 +524,7 @@
               <SubInterval>1</SubInterval>
             </RegionsIntervalInfo>
             <TilesIntervalInfo>
-              <IsActivated>true</IsActivated>
+              <IsActivated>false</IsActivated>
               <IsMainIntervalEnabled>true</IsMainIntervalEnabled>
               <IsSubIntervalEnabled>false</IsSubIntervalEnabled>
               <MainInterval>5</MainInterval>
@@ -657,41 +657,39 @@
     </AcquisitionBlock>
   </ExperimentBlocks>
   <HardwareSettingsPool>
-    <HardwareSetting Name="Reflected">
-      <ParameterCollection Id="MTBRLHalogenLamp">
-        <LampMode Status="Valid" IsActivated="true">Manual</LampMode>
-        <Intensity Status="Valid" IsActivated="true">27.19298245614</Intensity>
-      </ParameterCollection>
-      <ParameterCollection Id="MTBRLShutter">
-        <IsClosed Status="Valid" IsActivated="true">false</IsClosed>
-      </ParameterCollection>
-      <ParameterCollection Id="MTBRLApertureStop">
-        <Position Status="Valid" IsActivated="true" Unit="%">33.0550918197</Position>
-      </ParameterCollection>
-      <ParameterCollection Id="MTBTLHalogenLamp">
-        <LampMode Status="Valid" IsActivated="true">Standby</LampMode>
-        <Intensity Status="Valid" IsActivated="true">0</Intensity>
-      </ParameterCollection>
-      <ParameterCollection Id="MTBRLFieldStop">
-        <Position Status="Valid" IsActivated="true" Unit="%">85.396383866481</Position>
-      </ParameterCollection>
-      <ParameterCollection Id="MTBRLTLSwitch">
-        <PositionName Status="Valid" IsActivated="true">RLTLSwitch.RL</PositionName>
+    <HardwareSetting Name="Before [cPol] Smart">
+      <ParameterCollection Id="MTBTubeVisCamChanger">
+        <Position IsActivated="true">3</Position>
+        <PositionName IsActivated="true">FotoTube.VIS_Cam_0/100</PositionName>
       </ParameterCollection>
       <ParameterCollection Id="MTBReflectorChanger">
-        <PositionName Status="Valid" IsActivated="true">Reflector.424928-9901-000</PositionName>
-        <Position Status="Valid" IsActivated="true">1</Position>
+        <Position IsActivated="true">3</Position>
+        <PositionName IsActivated="true">Reflector.424937-9901-000</PositionName>
       </ParameterCollection>
-      <ParameterCollection Id="MTBRLFilterChanger1">
-        <PositionName Status="Valid" IsActivated="true">ND 100</PositionName>
-        <Position Status="Valid" IsActivated="true">1</Position>
-      </ParameterCollection>
-      <ParameterCollection Id="MTBRLFilterChanger2">
-        <PositionName Status="Valid" IsActivated="true">ND 100</PositionName>
-        <Position Status="Valid" IsActivated="true">1</Position>
+      <ParameterCollection Id="MTBTLHalogenLamp">
+        <LampMode Status="Valid" IsActivated="true">Manual</LampMode>
+        <Intensity Status="Valid" IsActivated="true">3</Intensity>
       </ParameterCollection>
     </HardwareSetting>
-    <HardwareSetting Name="AcquireStacksPolarized">
+    <HardwareSetting Name="After [cPol] Smart">
+      <ParameterCollection Id="MTBTLHalogenLamp">
+        <LampMode IsActivated="true">Standby</LampMode>
+        <Intensity IsActivated="true">0</Intensity>
+      </ParameterCollection>
+    </HardwareSetting>
+    <HardwareSetting Name="Before Exp [cPol] Smart">
+      <ParameterCollection Id="MTBRLHalogenLamp">
+        <Intensity IsActivated="true">0</Intensity>
+        <LampMode IsActivated="true">Standby</LampMode>
+      </ParameterCollection>
+      <ParameterCollection Id="MTBRLTLSwitch">
+        <Position IsActivated="true">1</Position>
+        <PositionName IsActivated="true">RLTLSwitch.TL</PositionName>
+      </ParameterCollection>
+      <ParameterCollection Id="MTBTLHalogenLamp">
+        <Intensity Status="Valid" IsActivated="true">49.952874646559</Intensity>
+        <LampMode Status="Valid" IsActivated="true">Manual</LampMode>
+      </ParameterCollection>
       <ParameterCollection Id="MTBReflectorChanger">
         <PositionName Status="Valid" IsActivated="true">Reflector.424937-9901-000</PositionName>
         <Position Status="Valid" IsActivated="true">3</Position>
@@ -699,16 +697,15 @@
       <ParameterCollection Id="MTBRLShutter">
         <IsClosed Status="Valid" IsActivated="true">true</IsClosed>
       </ParameterCollection>
-      <ParameterCollection Id="MTBTLHalogenLamp">
-        <LampMode Status="Valid" IsActivated="true">Manual</LampMode>
-        <Intensity Status="Valid" IsActivated="true">45.216859301885</Intensity>
-      </ParameterCollection>
-      <ParameterCollection Id="MTBRLTLSwitch">
-        <PositionName Status="Valid" IsActivated="true">RLTLSwitch.TL</PositionName>
-        <Position Status="Valid" IsActivated="true">1</Position>
-      </ParameterCollection>
+    </HardwareSetting>
+    <HardwareSetting Name="After Exp [cPol] Smart">
       <ParameterCollection Id="MTBRLHalogenLamp">
-        <Intensity Status="Valid" IsActivated="true">0</Intensity>
+        <Intensity IsActivated="true">0</Intensity>
+        <LampMode IsActivated="true">Standby</LampMode>
+      </ParameterCollection>
+      <ParameterCollection Id="MTBTLHalogenLamp">
+        <Intensity IsActivated="true">0</Intensity>
+        <LampMode IsActivated="true">Standby</LampMode>
       </ParameterCollection>
     </HardwareSetting>
   </HardwareSettingsPool>

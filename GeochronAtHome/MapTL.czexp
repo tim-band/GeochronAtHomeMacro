@@ -363,7 +363,7 @@
             </Calibration>
             <IsHolderEnabled>true</IsHolderEnabled>
             <HolderNumber />
-            <CorrelativeSessionId>a652912c-731c-4502-9d08-033553c8f93e</CorrelativeSessionId>
+            <CorrelativeSessionId>2899b70f-9008-4917-b9ec-b91940dddb41</CorrelativeSessionId>
           </HolderDocument>
           <SubDimensionSetups />
         </CorrelativeSetup>
@@ -375,7 +375,7 @@
             <Detector Id="MTBCamera_MTBTube_Cameraport.Axiocam506c">
               <ApplyCameraProfile Status="Valid">false</ApplyCameraProfile>
               <ApplyImageOrientation Status="Valid">true</ApplyImageOrientation>
-              <ExposureTime Status="Valid">24</ExposureTime>
+              <ExposureTime Status="Valid">100</ExposureTime>
               <Frame Status="Valid">0,0,2752,2208</Frame>
               <ImageOrientation Status="Valid">1</ImageOrientation>
               <ContinuousAcquisitionSafeMode Status="Valid">true</ContinuousAcquisitionSafeMode>
@@ -660,7 +660,7 @@
     <HardwareSetting Name="AcquireStacksTransmitted">
       <ParameterCollection Id="MTBTLHalogenLamp">
         <LampMode Status="Valid" IsActivated="true">Manual</LampMode>
-        <Intensity Status="Valid" IsActivated="true">8.0951436083096</Intensity>
+        <Intensity Status="Valid" IsActivated="true">32.600327397187</Intensity>
       </ParameterCollection>
       <ParameterCollection Id="MTBRLHalogenLamp">
         <LampMode Status="Valid" IsActivated="true">Standby</LampMode>

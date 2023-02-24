@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <HardwareExperiment Version="1.2">
   <RunMode>PreventFocusRestoreAfterExperiment,PreventStageXYRestoreAfterExperiment,PreventLightAndContrastManagerDeactivation</RunMode>
-  <BeforeHardwareSetting>AcquireStacksReflected</BeforeHardwareSetting>
+  <BeforeHardwareSetting>ActualHardware1 - Before</BeforeHardwareSetting>
   <AfterHardwareSetting></AfterHardwareSetting>
   <ExperimentBlockIndex>0</ExperimentBlockIndex>
   <IsSegmented>false</IsSegmented>
@@ -352,7 +352,7 @@
             </Calibration>
             <IsHolderEnabled>true</IsHolderEnabled>
             <HolderNumber />
-            <CorrelativeSessionId>4a6bb60c-2877-48a6-858c-a9480eada97f</CorrelativeSessionId>
+            <CorrelativeSessionId>31b35998-cd3f-4db0-a96e-15237e20cfb4</CorrelativeSessionId>
           </HolderDocument>
           <SubDimensionSetups />
         </CorrelativeSetup>
@@ -482,7 +482,7 @@
         <FocusSetup IsActivated="true">
           <RepetitionSettingsMode>Expert</RepetitionSettingsMode>
           <FocusStrategy IsActivated="true">
-            <StrategyMode>SoftwareAutofocus</StrategyMode>
+            <StrategyMode>LocalFocusSurface</StrategyMode>
             <ReferenceChannelId>637904744238241199</ReferenceChannelId>
             <FixedZPosition>0</FixedZPosition>
             <UseZPositionFromTilesSetup>true</UseZPositionFromTilesSetup>
@@ -513,7 +513,7 @@
               <SubInterval>1</SubInterval>
             </RegionsIntervalInfo>
             <TilesIntervalInfo>
-              <IsActivated>true</IsActivated>
+              <IsActivated>false</IsActivated>
               <IsMainIntervalEnabled>true</IsMainIntervalEnabled>
               <IsSubIntervalEnabled>false</IsSubIntervalEnabled>
               <MainInterval>5</MainInterval>
@@ -646,34 +646,22 @@
     </AcquisitionBlock>
   </ExperimentBlocks>
   <HardwareSettingsPool>
-    <HardwareSetting Name="AcquireStacksReflected">
+    <HardwareSetting Name="ActualHardware1 - Before">
+      <ParameterCollection Id="MTBReflectorChanger">
+        <Position Status="Valid" IsActivated="true">1</Position>
+        <PositionName Status="Valid" IsActivated="true">Reflector.424928-9901-000</PositionName>
+      </ParameterCollection>
       <ParameterCollection Id="MTBRLHalogenLamp">
+        <Intensity Status="Valid" IsActivated="true">50.507961704444</Intensity>
         <LampMode Status="Valid" IsActivated="true">Manual</LampMode>
-        <Intensity Status="Valid" IsActivated="true">49.298245614035</Intensity>
       </ParameterCollection>
       <ParameterCollection Id="MTBRLShutter">
+        <PositionName Status="Valid" IsActivated="true">Shutter.Closed</PositionName>
         <IsClosed Status="Valid" IsActivated="true">false</IsClosed>
       </ParameterCollection>
-      <ParameterCollection Id="MTBRLApertureStop">
-        <Position Status="Valid" IsActivated="true" Unit="%">33.0550918197</Position>
-      </ParameterCollection>
-      <ParameterCollection Id="MTBRLFieldStop">
-        <Position Status="Valid" IsActivated="true" Unit="%">85.396383866481</Position>
-      </ParameterCollection>
       <ParameterCollection Id="MTBRLTLSwitch">
-        <PositionName Status="Valid" IsActivated="true">RLTLSwitch.RL</PositionName>
-      </ParameterCollection>
-      <ParameterCollection Id="MTBReflectorChanger">
-        <PositionName Status="Valid" IsActivated="true">Reflector.424928-9901-000</PositionName>
-        <Position Status="Valid" IsActivated="true">1</Position>
-      </ParameterCollection>
-      <ParameterCollection Id="MTBRLFilterChanger1">
-        <PositionName Status="Valid" IsActivated="true">ND 6</PositionName>
         <Position Status="Valid" IsActivated="true">2</Position>
-      </ParameterCollection>
-      <ParameterCollection Id="MTBRLFilterChanger2">
-        <PositionName Status="Valid" IsActivated="true">ND 100</PositionName>
-        <Position Status="Valid" IsActivated="true">1</Position>
+        <PositionName Status="Valid" IsActivated="true">RLTLSwitch.RL</PositionName>
       </ParameterCollection>
     </HardwareSetting>
   </HardwareSettingsPool>

@@ -81,8 +81,8 @@
             <UsedSurfaceFitTypeName></UsedSurfaceFitTypeName>
             <DelayAfterStageMove>0</DelayAfterStageMove>
             <TileDimension>
-              <Width>249.8816</Width>
-              <Height>200.4864</Height>
+              <Width>124.9408</Width>
+              <Height>100.2432</Height>
               <CenterOffsetX>0</CenterOffsetX>
               <CenterOffsetY>0</CenterOffsetY>
             </TileDimension>
@@ -134,7 +134,7 @@
                           <ContrastMethods>ReflectedLightFluorescence</ContrastMethods>
                           <ContrastTypes>Unknown</ContrastTypes>
                           <Color>#FFD3D3D3</Color>
-                          <dye_id>Dye43D2A585</dye_id>
+                          <dye_id>Dye3F62CABF</dye_id>
                           <collection_id>00000000-0000-0000-0000-000000000000</collection_id>
                         </FluorescenceDye>
                       </Channel>
@@ -353,7 +353,7 @@
             </Calibration>
             <IsHolderEnabled>true</IsHolderEnabled>
             <HolderNumber />
-            <CorrelativeSessionId>63678b61-138c-420c-aa58-a9c43fd4adcb</CorrelativeSessionId>
+            <CorrelativeSessionId>6e58abe6-b522-476c-a5af-7fdb71348629</CorrelativeSessionId>
           </HolderDocument>
           <SubDimensionSetups />
         </CorrelativeSetup>
@@ -548,7 +548,7 @@
               <DY>0.49230072463768115</DY>
             </AutofocusRegion>
             <BacklashStepsize>2</BacklashStepsize>
-            <DepthOfFocus>0.44</DepthOfFocus>
+            <DepthOfFocus>0.35</DepthOfFocus>
             <DoBleachingCorrection>true</DoBleachingCorrection>
             <InitialDirection>0</InitialDirection>
             <IsAutomaticRange>false</IsAutomaticRange>
@@ -680,10 +680,6 @@
       <ParameterCollection Id="MTBRLFilterChanger2">
         <PositionName Status="Valid" IsActivated="true">ND 100</PositionName>
         <Position Status="Valid" IsActivated="true">1</Position>
-      </ParameterCollection>
-      <ParameterCollection Id="MTBObjectiveChanger">
-        <PositionName Status="Valid" IsActivated="true">Objective.422372-9901-000</PositionName>
-        <Position Status="Valid" IsActivated="true">4</Position>
       </ParameterCollection>
     </HardwareSetting>
   </HardwareSettingsPool>

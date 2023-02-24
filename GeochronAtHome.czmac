@@ -14,12 +14,14 @@
 # 7. Mica Z-stacks
 # 8. Dosimeter images (images sampled from mica with known area marked)
 #
-# Actions:
 # Add registration points [r] (1 -&gt; 2a)
 # Add mineral extent points [x] (1 -&gt; 2b)
 # Add mica extent points [m] (1 -&gt; 2c)
-# Create mineral tiled image (1,2b -&gt; 3)
-# Create mica tiled image (1,2c -&gt; 4)
+# Add mineral support points [support] (1 -&gt; 2d)
+# Add mineral support points [support_mica] (1 -&gt; 2e)
+# Add mica support points [support_mica]
+# Create mineral tiled image (1,2b,2d -&gt; 3)
+# Create mica tiled image (1,2c,2e -&gt; 4)
 # Launch Manimal for matrix (1,3,4 -&gt; 5)
 # Launch Manimal for POIs [r,i] (1,3 -&gt; 2)
 # Reregister POIs (2a,2? -&gt; 2a,2?)
@@ -453,6 +455,10 @@ class Documents(object):
         if not self.current_matrix_table:
             return None
         return 'current_reg_matrix.csv'
+    def new_poi(self, type, x, y, z, name):
+        i = self.poi.RowCount
+        self.poi.Rows.Add(type, x, y, z, name)
+        return Poi(self.poi, i)
     def get_pois(self, type='i', suitability_function=suitable_and_not_done):
         for i in range(self.poi.RowCount):
             name = self.poi.GetValue(i,4)
@@ -473,9 +479,23 @@ class Documents(object):
         for i in range(self.poi.RowCount):
             yield Poi(self.poi, i)
     def project_to_stage(self, x, y):
+        """
+        Takes a pair of project co-ordinates (for example the x and y
+        from a Poi) and returns the equivalent (x,y) in stage
+        co-ordinates (that is, having transformed it through the
+        registration matrix if there is one).
+        """
         if self.current_matrix:
             return linear.transform(self.current_matrix, x, y)
         return (x, y)
+    def stage_positions_of_poi(self, pois):
+        """
+        Returns a sequence of tuples (x, y, z) which are the stage
+        co-ordinates of the pois passed in.
+        """
+        for p in pois:
+            (x, y) = self.project_to_stage(p.x, p.y)
+            yield (x, y, p.z)
     def drive_to_xyz(self, x, y, **kwargs):
         (x,y) = self.project_to_stage(x, y)
         zen.move_stage(x, y, **kwargs)
@@ -584,6 +604,21 @@ class Documents(object):
             im2.Close()
             reg.name = filename
         self.save_poi()
+    def sample_description_filename(self):
+        return os.path.join(self.folder, 'sample.txt')
+    def sample_description(self):
+        fn = self.sample_description_filename()
+        if not os.path.exists(fn):
+            return None
+        with open(fn) as h:
+            return h.read()
+    def write_sample_description(self, new_text):
+        fn = self.sample_description_filename()
+        if new_text == None:
+            os.remove(path)
+            return
+        with open(fn, 'w') as h:
+            h.write(new_text)
 
 
 class AdjustPoiForm(AdjustForm):
@@ -677,12 +712,13 @@ class AdjustMicaMatrixForm(AdjustMatrixForm):
         ))
         cx = mbounds.SizeX / 2
         cy = mbounds.SizeY / 2
+        # Add a crosshair to the grain image to show where the centre is
         hline = cropped.Graphics.Add(ZenGraphicCategory.Line)
         hline.X1 = cx - 300
         hline.X2 = cx + 300
         hline.Y1 = cy
         hline.Y2 = cy
-        hline.Thickness = 2
+        hline.Thickness = 3
         hline.StrokeColor = ZenColors.Blue
         hline.IsMeasurementVisible = False
         hline.RotationAngle = 0
@@ -691,7 +727,7 @@ class AdjustMicaMatrixForm(AdjustMatrixForm):
         vline.X2 = cx
         vline.Y1 = cy - 300
         vline.Y2 = cy + 300
-        vline.Thickness = 2
+        vline.Thickness = 3
         vline.StrokeColor = ZenColors.Blue
         vline.IsMeasurementVisible = False
         vline.RotationAngle = 0
@@ -806,7 +842,7 @@ class AddPointForm(SelectForm):
         self.show()
         while self.action():
             (x,y,z) = self.docs.stage_position()
-            self.docs.poi.Rows.Add(self.TYPE, x, y, z, '')
+            self.docs.new_poi(self.TYPE, x, y, z, '')
         return self.count
     def __enter__(self):
         return self
@@ -1022,6 +1058,119 @@ class AdjustMicaExtentsTask(AdjustPointsTask):
     def name(self):
         return 'Adjust existing mica extents'
 
+def extent_from_pois(pois):
+    ps = list(pois)
+    xmax = xmin = ps[0].x
+    ymax = ymin = ps[0].y
+    z = ps[0].z
+    for p in ps[1:]:
+        x = p.x
+        y = p.y
+        if x &lt; xmin:
+            xmin = x
+        elif xmax &lt; x:
+            xmax = x
+        if y &lt; ymin:
+            ymin = y
+        elif ymax &lt; y:
+            ymax = y
+        z += p.z
+    return (xmin, xmax, ymin, ymax, z / len(ps))
+
+class SurfaceFocusPointsTask(AdjustPointsTask):
+    LAYOUT_OPTIONS = {
+        '2 rows of 2 (flat)': (2, 2),
+        '3 rows of 3 (parabolic)': (3, 3),
+        '4 rows of 3 (parabolic)': (4, 3),
+        '4 rows of 4 (parabolic)': (4, 4),
+        '5 rows of 5 (cubic)': (5, 5)
+    }
+    DEFAULT_OPTION = 2
+    def get_existing_pois(self):
+        return self.docs.get_pois(
+            type=self.POI_TYPE,
+            suitability_function=suitable
+        )
+    def get_pois(self):
+        if self.rows is None:
+            return self.get_existing_pois()
+        (xmin, xmax, ymin, ymax, z) = extent_from_pois(
+            self.get_extent_pois()
+        )
+        dx = (xmax - xmin) / self.columns
+        dy = (ymax - ymin) / self.rows
+        startx = xmin + dx / 2
+        y = ymin + dy / 2
+        pois = []
+        existing_pois = self.docs.get_pois(
+            type=self.POI_TYPE,
+            suitability_function=all_points
+        )
+        for r in range(self.rows):
+            if r % 2 == 0:
+                cols = range(self.columns)
+            else:
+                cols = range(self.columns - 1, -1, -1)
+            for c in cols:
+                x = startx + c * dx
+                try:
+                    poi = next(existing_pois)
+                    poi.x = x
+                    poi.y = y
+                    poi.z = z
+                    poi.name = ''
+                    pois.append(poi)
+                except StopIteration:
+                    pois.append(self.docs.new_poi(
+                        self.POI_TYPE, x, y, z, ''
+                    ))
+            y += dy
+        for poi in existing_pois:
+            poi.name = '# Unsuitable'
+        return pois
+    def get_extent_pois(self):
+        return self.docs.get_pois(self.EXTENT_POI_TYPE)
+    def is_available(self):
+        return has_at_least(self.get_extent_pois(), 2)
+    def recommended(self):
+        return not has_at_least(self.get_existing_pois(), 4)
+    def do(self):
+        existing_pois = list(self.get_existing_pois())
+        existing_pois_option = None
+        options = self.LAYOUT_OPTIONS.keys()
+        options.sort()
+        default_option = self.DEFAULT_OPTION
+        if has_at_least(existing_pois, 4):
+            existing_pois_option = 'Adjust existing points ({0})'.format(len(existing_pois))
+            default_option = len(options)
+            options.append(existing_pois_option)
+        window = Zen.Windows.CreateWindow('Choose a layout')
+        window.AddDropDown('layout', 'Layout', options, default_option)
+        result = window.Show()
+        if result.HasCanceled:
+            return None
+        chosen = result.GetValue('layout')
+        self.rows = None
+        self.columns = None
+        if chosen != existing_pois_option:
+            (self.rows, self.columns) = self.LAYOUT_OPTIONS[chosen]
+        super(SurfaceFocusPointsTask, self).do()
+
+class MineralSurfaceFocusPointsTask(SurfaceFocusPointsTask):
+    SAVE_MESSAGE = 'Save changes to mineral surface focus points?'
+    POI_TYPE = 'support_mineral'
+    EXTENT_POI_TYPE = 'x'
+    def name(self):
+        return 'Create or adjust mineral focus points'
+
+class MicaSurfaceFocusPointsTask(SurfaceFocusPointsTask):
+    SAVE_MESSAGE = 'Save changes to mica surface focus points?'
+    POI_TYPE = 'support_mica'
+    EXTENT_POI_TYPE = 'm'
+    DEFAULT_OPTION = 0
+    def name(self):
+        return 'Create or adjust mica focus points'
+
 def current_magnification():
     return Zen.Devices.ObjectiveChanger.GetMagnificationByPosition(Zen.Devices.ObjectiveChanger.ActualPosition)
 
@@ -1035,27 +1184,9 @@ def request_magnification(mag):
 class NeedFocusTask(Task):
     def get_pois(self):
         return self.docs.get_pois(self.POI_TYPE)
-    def extent_from_pois(self, pois):
-        ps = list(pois)
-        xmax = xmin = ps[0].x
-        ymax = ymin = ps[0].y
-        z = ps[0].z
-        for p in ps[1:]:
-            x = p.x
-            y = p.y
-            if x &lt; xmin:
-                xmin = x
-            elif xmax &lt; x:
-                xmax = x
-            if y &lt; ymin:
-                ymin = y
-            elif ymax &lt; y:
-                ymax = y
-            z += p.z
-        return (xmin, xmax, ymin, ymax, z / len(ps))
     def get_focus_position(self):
         ps = self.get_pois()
-        (xmin, xmax, ymin, ymax, z) = self.extent_from_pois(ps)
+        (xmin, xmax, ymin, ymax, z) = extent_from_pois(ps)
         return ((xmin + xmax) / 2, (ymin + ymax) / 2)
     def get_focused(self):
         (x, y) = self.get_focus_position()
@@ -1069,24 +1200,42 @@ class NeedFocusTask(Task):
 class CreateTiledImageTask(NeedFocusTask):
     REG_SIZE = 50
     MAGNIFICATION = 10
+    SUPPORT_POI_TYPE = None
     def get_pois(self):
         return self.docs.get_pois(self.POI_TYPE)
+    def get_support_pois(self):
+        if self.SUPPORT_POI_TYPE is None:
+            return None
+        return self.docs.get_pois(
+            self.SUPPORT_POI_TYPE,
+            suitability_function=suitable
+        )
     def get_extents(self):
         return [list(self.get_pois())]
     def is_available(self):
+        supports = self.get_support_pois()
+        if supports is not None:
+            if not has_at_least(supports, 4):
+                return False
         return has_at_least(self.get_pois(), 2)
     def extra_points(self):
         return []
     def user_setup(self):
         request_magnification(self.MAGNIFICATION)
+    def get_degree(self, point_count):
+        n = 0
+        for v in [4, 9, 15, 22]:
+            if point_count &lt; v:
+                return n
+            n += 1
+        return n
     def do(self):
         self.user_setup()
-        self.get_focused()
         exp_file = copy_experiment(self.EXPERIMENT_NAME)
         exp = Zen.Acquisition.Experiments.GetByFileName(exp_file)
         exp.ClearTileRegionsAndPositions(0)
         for ps in self.get_extents():
-            (xmin_proj, xmax_proj, ymin_proj, ymax_proj, z) = self.extent_from_pois(ps)
+            (xmin_proj, xmax_proj, ymin_proj, ymax_proj, z) = extent_from_pois(ps)
             (xmin, ymin) = self.docs.project_to_stage(xmin_proj, ymin_proj)
             (xmax, ymax) = self.docs.project_to_stage(xmax_proj, ymax_proj)
             w = xmax - xmin
@@ -1095,6 +1244,18 @@ class CreateTiledImageTask(NeedFocusTask):
         for p in self.extra_points():
             (x, y) = self.docs.stage_position_of_poi(p)
             exp.AddRectangleTileRegion(0, x, y, self.REG_SIZE, self.REG_SIZE, p.z)
+        supports = self.get_support_pois()
+        if supports is None:
+            self.get_focused()
+        else:
+            exp.Save()
+            supports = list(supports)
+            workarounds.add_support_points(
+                exp_file,
+                self.docs.stage_positions_of_poi(supports),
+                interpolation_degree=self.get_degree(len(supports))
+            )
+            exp.Load(exp_file)
         tiles = Zen.Acquisition.Execute(exp)
         path = os.path.join(self.docs.folder, self.FILE_NAME)
         zen.save_as(tiles, path, True)
@@ -1105,6 +1266,7 @@ class CreateTiledImageTask(NeedFocusTask):
 
 class CreateMineralImageTask(CreateTiledImageTask):
     POI_TYPE = 'x'
+    SUPPORT_POI_TYPE = 'support_mineral'
     EXPERIMENT_NAME = tile_rl_experiment_name
     FILE_NAME = 'minerals.czi'
     EXPERIMENT_NAMES = {
@@ -1138,6 +1300,7 @@ class CreateMineralImageTask(CreateTiledImageTask):
 
 class CreateMicaImageTask(CreateTiledImageTask):
     POI_TYPE = 'm'
+    SUPPORT_POI_TYPE = 'support_mica'
     EXPERIMENT_NAME = tile_tl_experiment_name
     FILE_NAME = 'mica.czi'
     def name(self):
@@ -1378,7 +1541,7 @@ def acquire_stack(parameters, folder, prefix=''):
         im.Save(os.path.join(folder, "{1}Stack-{0:02d}.jpg".format(i, prefix)), 80)
     Zen.Devices.Focus.MoveTo(focus)
 
-class CaptureZStacksTask(NeedFocusTask):
+class CaptureZStacksTask(Task):
     FILE_PREFIX = ''
     MAX_FAILURES = 3
     EXPERIMENT_NAME = coarse_focus_experiment_name
@@ -1434,6 +1597,7 @@ class CaptureZStacksTask(NeedFocusTask):
         zen.autofocus(self.FINE_FOCUS_EXPERIMENT_NAME)
     def manual_focus(self, poi):
         zen.set_hardware(hs_reflected)
+        zen.show_live()
         setExposureTime(100)
         Zen.Application.Pause('Please focus manually')
     def drive_to(self, poi):
@@ -1455,7 +1619,6 @@ class CaptureZStacksTask(NeedFocusTask):
         failures = 0
         pois = list(self.get_pois())
         self.preprocess_pois(pois)
-        self.get_focused()
         with ProgressOutput(len(pois)) as progress:
             for poi in pois:
                 self.drive_to(poi)
@@ -1569,6 +1732,19 @@ class CaptureMicaZStacksTask(CaptureZStacksTask):
     def get_folder(self, poi):
         return poi.name
 
+class SampleDescriptionTask(Task):
+    def name(self):
+        return 'Write or edit the sample description'
+    def recommended(self):
+        return False
+    def do(self):
+        window = Zen.Windows.CreateWindow('Sample Description')
+        window.AddMultiLineTextBox('text', 'Sample Description', self.docs.sample_description(), '1-4', '1', 0)
+        result = window.Show()
+        if not result.HasCanceled:
+            text = result.GetValue('text')
+            self.docs.write_sample_description(text)
+
 def get_project_folder():
     window = Zen.Windows.CreateWindow('Choose folder to work in')
     documents_folder = Zen.Application.Environment.GetFolderPath(ZenSpecialFolder.Documents)
@@ -1589,9 +1765,12 @@ def run_a_task(folder):
         AdjustMineralExtentsTask,
         AddMicaExtentsTask,
         AdjustMicaExtentsTask,
+        MineralSurfaceFocusPointsTask,
+        MicaSurfaceFocusPointsTask,
         CreateMineralImageTask,
         CreateMicaImageTask,
         AdjustMicaMatrixTask,
+        SampleDescriptionTask,
         ReRegisterPointsTask,
         ResetRegistrationTask,
         ResurrectUnsuitableTask,
@@ -1634,6 +1813,6 @@ while run_a_task(folder):
   <Author></Author>
   <Description></Description>
   <Keywords></Keywords>
-  <Row>695</Row>
-  <Column>31</Column>
+  <Row>1738</Row>
+  <Column>1</Column>
 </Script>

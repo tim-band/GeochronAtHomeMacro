@@ -9,6 +9,7 @@
 
 import os
 import random
+import xml.etree.ElementTree as ET
 
 class UserCancelledException(Exception):
     pass
@@ -155,3 +156,46 @@ class Workarounds:
         zen_image.Close()
         os.rename(src, path)
         return True
+
+def add_support_points(exp_file_name, points, interpolation_degree=2, region_name='TR1'):
+    """
+    exp_file_name is the full file name of an experiment, which should
+    be closed.
+    points is a sequence of tuples (x, y, z) in stage co-ordinates.
+    interpolation_degree is 0 for horizontal, 1 for flat, 2, 3 or 4 for
+    'parabolic'. Not sure Zeiss are correct about that.
+    """
+    tree = ET.parse(exp_file_name)
+    root = tree.getroot()
+    acq_block = root.find('./ExperimentBlocks/AcquisitionBlock[@IsActivated="true"]')
+    sample_holder = acq_block.find('./SubDimensionSetups/RegionsSetup[@IsActivated="true"]/SampleHolder')
+    global_interpolation_degree = sample_holder.find('./GlobalInterpolationExpansionDegree')
+    local_interpolation_degree = sample_holder.find('./LocalInterpolationExpansionDegree')
+    tile_region = sample_holder.find('./TileRegions/TileRegion[@Name="{0}"]'.format(region_name))
+    focus_strategy_mode = acq_block.find('./HelperSetups/FocusSetup[@IsActivated="true"]/FocusStrategy[@IsActivated="true"]/StrategyMode')
+
+    focus_strategy_mode.text = 'LocalFocusSurface'
+    global_interpolation_degree.text = str(interpolation_degree)
+    local_interpolation_degree.text = str(interpolation_degree)
+    
+    old_sps = tile_region.find('SupportPoints')
+    if old_sps is not None:
+        tile_region.remove(old_sps)
+    support_points = ET.SubElement(tile_region, 'SupportPoints')
+
+    [cx, cy] = map(float, tile_region.find('CenterPosition').text.split(','))
+    [w, h] = map(float, tile_region.find('ContourSize').text.split(','))
+    
+    id_prefix = '{0:08d}'.format(random.randint(0,99999999))
+    n = 0
+    for (x, y, z) in points:
+        sp = ET.SubElement(support_points, 'SupportPoint', {
+            'Name': 'SP',
+            'Id': '{0}{1:04d}'.format(id_prefix, n)
+        })
+        ET.SubElement(sp, 'X').text = str(x)
+        ET.SubElement(sp, 'Y').text = str(y)
+        ET.SubElement(sp, 'Z').text = str(z)
+        n += 1
+    print exp_file_name
+    tree.write(exp_file_name)
