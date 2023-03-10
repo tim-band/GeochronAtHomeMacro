@@ -1092,27 +1092,37 @@ class SurfaceFocusPointsTask(AdjustPointsTask):
             suitability_function=suitable
         )
     def get_pois(self):
+        # Proportion of the extents that is a margin
+        # that we won't try to focus on round the edge.
+        # Usually a lot of this area is off the mica/epoxy.
+        margin = 0.05
         if self.rows is None:
             return self.get_existing_pois()
         (xmin, xmax, ymin, ymax, z) = extent_from_pois(
             self.get_extent_pois()
         )
-        dx = (xmax - xmin) / self.columns
-        dy = (ymax - ymin) / self.rows
-        startx = xmin + dx / 2
-        y = ymin + dy / 2
+        to_edge = 0.5 - margin
+        half_width = (xmax - xmin) * to_edge
+        xmid = (xmin + xmax) / 2
+        dtheta = math.pi / self.columns
+        xs = [
+            xmid - half_width * math.cos((n + 0.5) * dtheta)
+            for n in range(self.columns)
+        ]
+        half_height = (ymax - ymin) * to_edge
+        ymid = (ymin + ymax) / 2
+        dtheta = math.pi / self.rows
+        ys = [
+            ymid - half_height * math.cos((n + 0.5) * dtheta)
+            for n in range(self.rows)
+        ]
         pois = []
         existing_pois = self.docs.get_pois(
             type=self.POI_TYPE,
             suitability_function=all_points
         )
-        for r in range(self.rows):
-            if r % 2 == 0:
-                cols = range(self.columns)
-            else:
-                cols = range(self.columns - 1, -1, -1)
-            for c in cols:
-                x = startx + c * dx
+        for y in ys:
+            for x in xs:
                 try:
                     poi = next(existing_pois)
                     poi.x = x
@@ -1124,7 +1134,7 @@ class SurfaceFocusPointsTask(AdjustPointsTask):
                     pois.append(self.docs.new_poi(
                         self.POI_TYPE, x, y, z, ''
                     ))
-            y += dy
+            xs.reverse()
         for poi in existing_pois:
             poi.name = '# Unsuitable'
         return pois
@@ -1813,6 +1823,6 @@ while run_a_task(folder):
   <Author></Author>
   <Description></Description>
   <Keywords></Keywords>
-  <Row>1738</Row>
-  <Column>1</Column>
+  <Row>1093</Row>
+  <Column>22</Column>
 </Script>

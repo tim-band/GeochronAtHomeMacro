@@ -86,8 +86,6 @@ class Workarounds:
         if type(hardware_setting) is str:
             hs = self.zen.Application.HardwareSettings.GetByName(hardware_setting)
             if hs == None:
-                print dir(self.zeiss.Micro.Scripting.ZenHardwareSetting)
-                print hardware_setting
                 hs = self.zeiss.Micro.Scripting.ZenHardwareSetting.__class__(hardware_setting)
                 if hs == None:
                     raise Exception('No such harware setting {0}'.format(hardware_setting))
@@ -197,5 +195,4 @@ def add_support_points(exp_file_name, points, interpolation_degree=2, region_nam
         ET.SubElement(sp, 'Y').text = str(y)
         ET.SubElement(sp, 'Z').text = str(z)
         n += 1
-    print exp_file_name
     tree.write(exp_file_name)
