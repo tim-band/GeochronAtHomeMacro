@@ -62,6 +62,10 @@ from System import (Environment)
 zen = workarounds.Workarounds(Zen, Zeiss)
 
 def resource_location(name):
+    """
+    Returns the full path to a file in the Macros/GeochronAtHome
+    directory.
+    """
     return os.path.join(
         Zen.Application.Environment.GetFolderPath(ZenSpecialFolder.UserDocuments),
         'Macros',
@@ -70,6 +74,19 @@ def resource_location(name):
     )
 
 def copy_experiment(path):
+    """
+    Zen does not seem to run experiments well if they are not in
+    the experiments directory, but if they are in the Experiments
+    directory they will be damaged by users using the microscope
+    while that experiment is inadvertantly open. We get around
+    this problem by storing experiments in a subdirectory of the
+    Macros directory, and copying them into the Experiments
+    directory only while they are being run.
+    This function copies an experiment into the Experiments folder
+    and activates it, which is harder than you'd think.
+    It returns the full path of the copied experiment file in the
+    Experiments directory.
+    """
     Zen.Application.LeftToolArea.SwitchToTab(ZenToolTab.LocateTab)
     dest = os.path.join(
         Zen.Application.Environment.GetFolderPath(ZenSpecialFolder.UserDocuments),
@@ -89,6 +106,9 @@ fine_focus_experiment_name = resource_location('FocusRL.czexp')
 coarse_focus_experiment_name = resource_location('FocusRLCoarse.czexp')
 map_experiment_name = resource_location('MapTL.czexp')
 
+# We don't want or need a camera settings file, but we do need a
+# ZenCameraSetting object, so here it is, designed to work well
+# with the experiments in the Macros/GeochronAtHome directory.
 camera_setting = ZenCameraSetting()
 camera_setting.SetParameter("AnalogGainModeList", 0)
 camera_setting.SetParameter("WhiteBalance", "0.661,1,0.407")
@@ -96,10 +116,19 @@ camera_setting.SetParameter("WhiteBalanceOffset", 0)
 camera_setting.SetParameter("ColorSaturation", 0.5)
 
 def setExposureTime(ms):
+    """ Sets the exposure time of the camera hardware. """
     camera_setting.SetParameter("ExposureTime", ms)
     Zen.Acquisition.ActiveCamera.ApplyCameraSetting(camera_setting)
 
 def makeHardwareSetting(name):
+    """
+    Returns a ZenHardwareSetting object constructed from the data
+    in the hardware_settings.py module, which are designed to work
+    well with the experiments in the Macros/GeochronAtHome
+    directory. This saves us from having to look after extra files
+    in Macros/GeochronAtHome while making the settings easy to
+    edit.
+    """
     hs = ZenHardwareSetting()
     for (id, ps) in hardware_settings.settings[name].items():
         for (param, value) in ps.items():
@@ -113,7 +142,13 @@ class UserCancelledException(Exception):
     pass
 
 class ProgressOutput(Form):
+    """
+    A Windows Form control showing a progress bar with estimated
+    time of finishing, with a count of the number of successful
+    and failed steps.
+    """
     def __init__(self, count):
+        """ Constructs a progress bar with `count` steps. """
         super(ProgressOutput, self).__init__()
         width = 450
         self.Text = "Progress"
@@ -156,15 +191,23 @@ class ProgressOutput(Form):
         self.start_time = time.time()
         self.start_clock = time.clock()
         self.Show()
-    def result(self):
-        return self.combo.SelectedItem
     def close(self):
+        """ Closes and deletes this window. """
         self.Close()
         self.Dispose()
     def start(self, name):
+        """
+        Sets the current step name. Make sure any previous step has been
+        stopped before calling this or you are just renaming the current
+        step.
+        """
         self.current.Text = name
         self.in_task = True
     def stop(self, success):
+        """
+        Stops the current step, marking it as failed or successful according
+        to the `success` parameter.
+        """
         if not self.in_task:
             return
         self.in_task = False
@@ -178,7 +221,14 @@ class ProgressOutput(Form):
             self.failures.Text += self.current.Text
 
 class SelectForm(Form):
+    """ A Windows form with a combo box to select from. """
     def __init__(self, title, label, options):
+        """
+        title: The title for the window.
+        label: The label for the combo box.
+        options: An array of options that the user chooses between;
+        each one is simply the text to be displayed to the user.
+        """
         super(SelectForm, self).__init__()
         self.Text = title
         self.AutoSize = True
@@ -200,17 +250,26 @@ class SelectForm(Form):
         self.layout.Controls.Add(self.combo, 1, 0)
         self.TopMost = True
     def show(self):
+        """ Makes the window visible. """
         self.Show()
     def result(self):
+        """
+        Returns the selected item, which is its text display string.
+        """
         return self.combo.SelectedItem
     def close(self):
+        """ Closes and destroys this window. """
         self.Close()
         self.Dispose()
 
 def removeNones(array):
+    """ Returns array but without any falsy elements. """
     return [x for x in array if x]
 
 class AdjustForm(SelectForm):
+    """
+    Form suitable for adjusting points. Can be used with `with`.
+    """
     OK = 'set to current position and focus'
     LEAVE = 'leave as it is'
     MARK = 'mark as unsuitable'
@@ -223,11 +282,20 @@ class AdjustForm(SelectForm):
     TITLE = 'Choose what should happen to this POI'
     LABEL = 'What should we do with this POI?'
     def get_prompt(self, count, total, kept):
+        """
+        Returns the text to display to the user while they are
+        performing the adjustment.
+        """
         return (
             'Adjust position and focus ({0} of {1}) ({2} kept so far)'
             .format(count, total, kept)
         )
     def __init__(self, objects):
+        """
+        objects: The POIs to be adjusted. These objects can be of any
+        type, provided that the overridden methods drive, undrive, change,
+        do_adjust, do_mark and unmark_all work with this type.
+        """
         super(AdjustForm, self).__init__(
             self.TITLE,
             self.LABEL,
@@ -278,16 +346,36 @@ class AdjustForm(SelectForm):
         while not self.try_update_adjust_action():
             pass
     def drive(self, o, count, total_count):
+        """
+        Moves the stage and focus to the object `o`
+        """
         pass
     def do_adjust(self, o):
+        """
+        Alters `o` in response to the adjustment the user made.
+        """
         pass
     def do_mark(self, o):
+        """ Marks `o` as unsuitable. """
         pass
     def unmark_all(self):
+        """
+        Throws away all changes, including objects being marked
+        as unsuitable.
+        """
         pass
     def undrive(self, o):
+        """
+        Performs any actions needed after the user has finished
+        with the object `o`.
+        """
         pass
     def change(self, o, count, total_count):
+        """
+        Performs whatever actions is required in response to the
+        user choosing the 'change' option. For example, switching
+        between minerals and mica views.
+        """
         pass
     def action_for_one_point(self, o):
         self.count += 1
@@ -327,6 +415,7 @@ class AdjustForm(SelectForm):
         self.close()
 
 class Poi(object):
+    """ Point of interest, or actually any point on the slide. """
     def __init__(self, table, row):
         self.table = table
         self.row = row
@@ -374,24 +463,59 @@ class Poi(object):
         return self.table.GetValue(self.row, 0)
     @property
     def name(self):
+        """
+        The name is any textual metadata, for example the path of the POI's
+        directory on disk.
+        """
         return self.table.GetValue(self.row, 4)
     @name.setter
     def name(self, value):
         self.table.SetValue(self.row, 4, value)
 
 def suitable_and_not_done(is_unsuitable, is_done):
+    """
+    suitability_function for Documents.get_pois indicating that
+    POIs that have not been marked as unsuitable and do not yet
+    have Z-stack images generated should be returned.
+    """
     return not is_unsuitable and not is_done
 
 def suitable(is_unsuitable, is_done):
+    """
+    suitability_function for Documents.get_pois indicating that
+    all POIs that have not been marked as unsuitable should be
+    returned.
+    """
     return not is_unsuitable
 
 def unsuitable(is_unsuitable, is_done):
+    """
+    suitability_function for Documents.get_pois indicating that
+    all POIs that have been marked as unsuitable should be
+    returned.
+    """
     return is_unsuitable
 
 def all_points(is_suitable, is_done):
+    """
+    suitability_function for Documents.get_pois indicating that
+    all POIs should be returned.
+    """
     return True
 
 class Documents(object):
+    """
+    Provides easy access to the various documents stored in the project's
+    directory. One object of this class is created before a task is chosen,
+    and then forgotten after the task is completed. This means that an
+    instance does not have to worry about new files that are created while
+    it is alive as these files tend to be created as the result of a task,
+    so it is up to the next Documents object created to know about it, not
+    the one that was alive when it was created.
+    Each Task object uses a Documents object to tell if the files
+    necessary for its operation are present, and usually for access to
+    those files.
+    """
     def load(self, filename):
         """ Load a csv file as a table """
         return Zen.Application.LoadTable(
@@ -460,6 +584,12 @@ class Documents(object):
         self.poi.Rows.Add(type, x, y, z, name)
         return Poi(self.poi, i)
     def get_pois(self, type='i', suitability_function=suitable_and_not_done):
+        """
+        Returns the POIs of the specified type that are as suitable
+        as required. The functions `all_grains`, `suitable`, `unsuitable`
+        and `suitable_and_not_done` are provided as standard suitability
+        specifiers.
+        """
         for i in range(self.poi.RowCount):
             name = self.poi.GetValue(i,4)
             if name != '' and name[0] != '#' and not os.path.exists(name):
@@ -476,6 +606,7 @@ class Documents(object):
             if t == type and suitability_function(is_unsuitable, is_done):
                 yield Poi(self.poi, i)
     def all_pois(self):
+        """ Returns all POIs. """
         for i in range(self.poi.RowCount):
             yield Poi(self.poi, i)
     def project_to_stage(self, x, y):
@@ -497,17 +628,32 @@ class Documents(object):
             (x, y) = self.project_to_stage(p.x, p.y)
             yield (x, y, p.z)
     def drive_to_xyz(self, x, y, **kwargs):
+        """
+        Drives to (x,y) or (x, y, z=z) in project co-ordinates;
+        that is, after applying the registration matrix to get
+        stage co-ordinates.
+        """
         (x,y) = self.project_to_stage(x, y)
         zen.move_stage(x, y, **kwargs)
     def drive_to_poi(self, p):
+        """
+        Drives to the specified `Poi` object.
+        """
         self.drive_to_xyz(p.x, p.y, z=p.z)
     def drive_to_poi_mica(self, p):
+        """
+        Drives to the image of the specified `Poi` object after
+        applying the mica transformation. That is, goes to the
+        point on the mica that corresponds to the poi's
+        position on the minerals.
+        """
         (x,y) = linear.transform(self.matrix, p.x, p.y)
         self.drive_to_xyz(x, y, z=p.micaZ)
         zen.show_live()
     def stage_position(self):
         """
-        returns the stage position in project coordinates
+        Returns the stage position in project coordinates, that
+        is, after unapplying the registration matrix.
         """
         x = Zen.Devices.Stage.ActualPositionX
         y = Zen.Devices.Stage.ActualPositionY
@@ -516,12 +662,14 @@ class Documents(object):
         return (x, y, Zen.Devices.Focus.ActualPosition)
     def stage_position_of_poi(self, p):
         """
-        returns the POI's position in stage coordinates
+        Returns the POI's position in stage coordinates.
         """
         return self.project_to_stage(p.x, p.y)
     def poi_mica_position(self, p):
         """
-        returns the POI's mica position in project coordinates
+        Returns the POI's mica position in project coordinates;
+        that is, the mica transformation is applied but not the
+        registration matrix.
         """
         return linear.transform(self.matrix, p.x, p.y)
     def mica_angle(self):
@@ -542,17 +690,26 @@ class Documents(object):
         path = os.path.join(self.folder, filename)
         self.delete_full_path(path)
     def delete_minerals(self):
+        """ Deletes the tiled CZI image of the minerals. """
         for n in self.minerals_files():
             self.delete_full_path(n)
         self.has_minerals = False
     def delete_mica(self):
+        """ Deletes the tiled CZI image of the mica. """
         self.delete('mica.czi')
         self.has_mica = False
     def delete_current_matrix(self):
+        """ Deletes the registration matrix. """
         self.delete('current_reg_matrix.csv')
         self.current_matrix = None
         self.current_matrix_table = None
     def get_next_grain_folder(self):
+        """
+        Gets the next 'free' name for a grain folder. That is,
+        finds the subdirectory name "GrainNN" with the lowest
+        number NN that does not already exist in the project
+        directory.
+        """
         pattern = os.path.join(self.folder, 'Grain') + '{1:02d}'
         while True:
             name = pattern.format(folder, self.grain_folder_number)
@@ -622,6 +779,10 @@ class Documents(object):
 
 
 class AdjustPoiForm(AdjustForm):
+    """
+    Form suitable for adjusting points defined as Poi objects.
+    Can be used with `with`.
+    """
     HARDWARE_SETTING = hs_transmitted
     EXPOSURE_TIME_MS = 100
     def __init__(self, pois, docs):
@@ -637,6 +798,10 @@ class AdjustPoiForm(AdjustForm):
         poi.name = '# Unsuitable'
 
 class AdjustMatrixForm(AdjustForm):
+    """
+    Form suitable for adjusting points defined as Poi objects
+    that define a rotation/mirror matrix. Can be used with `with`.
+    """
     OK = 'set to current position'
     LEAVE = 'ignore this point for now'
     MARK = 'mark this POI as unsuitable'
@@ -713,6 +878,7 @@ class AdjustMicaMatrixForm(AdjustMatrixForm):
         cx = mbounds.SizeX / 2
         cy = mbounds.SizeY / 2
         # Add a crosshair to the grain image to show where the centre is
+        # because annoyingly the live and snapped images do not line up.
         hline = cropped.Graphics.Add(ZenGraphicCategory.Line)
         hline.X1 = cx - 300
         hline.X2 = cx + 300
@@ -921,6 +1087,12 @@ class ResurrectUnsuitableWithMicaForm(ResurrectUnsuitableForm):
         self.do_drive(o, self.at_mica, count, total_count)
 
 def has_at_least(seq, n):
+    """
+    Returns True if and only if the sequence `seq` has at least
+    `n` elements. This is the moral equivalent of `n &lt;= len(seq)`
+    except that it works with sequences that do not work with
+    `len` (for example maps and generators).
+    """
     for s in seq:
         n -= 1
         if n &lt;= 0:
@@ -928,12 +1100,24 @@ def has_at_least(seq, n):
     return False
 
 def count(seq):
+    """
+    Returns the number of elements in the sequence `seq`. This is
+    the moral equivalent of `len(seq)` except that it works with
+    sequences that do not work with `len` (for example maps and
+    generators).
+    """
     n = 0
     for s in seq:
         n += 1
     return n
 
 class Task(object):
+    """
+    An option for the user to choose from in the task list.
+    Tasks know if they are available (if all of thier inputs
+    are present) and recommended (usually this is if their
+    outputs have not been produced yet).
+    """
     def __init__(self, docs):
         self.docs = docs
     def name(self):
@@ -946,15 +1130,30 @@ class Task(object):
         raise NotImplementedError()
 
 class RefreshTask(Task):
+    """
+    Does nothing, but choosing this causes all the tasks to
+    be reloaded and reevaluated for whether they are available
+    and recommended.
+    """
     def name(self):
         return 'Refresh task list'
     def do(self):
         pass
 
 class PointTask(Task):
+    """
+    Base class for tasks that want a confirmation that they
+    should save changes to the POIs.
+    """
     SAVE_MESSAGE = 'Save changes to points?'
     def save(self):
         self.docs.save_poi()
+    def adjust_points(self):
+        """
+        Allows the user to adjust the points. Returns the
+        number of points adjusted.
+        """
+        raise NotImplementedError()
     def do(self):
         count = self.adjust_points()
         if count == 0:
@@ -1058,6 +1257,12 @@ class AdjustMicaExtentsTask(AdjustPointsTask):
     def name(self):
         return 'Adjust existing mica extents'
 
+class AdjustDosimetrySamplePointsTask(AdjustPointsTask):
+    SAVE_MESSAGE = 'Save changes to dosimetry sample points?'
+    POI_TYPE = 'dosi'
+    def name(self):
+        return 'Adjust existing dosimetry sample points'
+
 def extent_from_pois(pois):
     ps = list(pois)
     xmax = xmin = ps[0].x
@@ -1076,6 +1281,74 @@ def extent_from_pois(pois):
             ymax = y
         z += p.z
     return (xmin, xmax, ymin, ymax, z / len(ps))
+
+def set_poi_grid(docs, xs, ys, z, poi_type, existing_pois):
+    """
+    Sets a grid of points, all at `z` but with rows defined by
+    the values in `ys` and columns defined by the values in `xs`.
+    They will have type `poi_type` and the values in
+    `existing_pois` will be reused. Any existing pois not used
+    will be marked as unsuitable. Existing pois will not have
+    their type changed.
+    """
+    pois = []
+    for y in ys:
+        for x in xs:
+            try:
+                poi = next(existing_pois)
+                poi.x = x
+                poi.y = y
+                poi.z = z
+                poi.name = ''
+                pois.append(poi)
+            except StopIteration:
+                pois.append(docs.new_poi(
+                    poi_type, x, y, z, ''
+                ))
+        xs.reverse()
+    for poi in existing_pois:
+        poi.name = '# Unsuitable'
+    return pois
+
+class AddDosimetrySamplePointsTask(PointTask):
+    SAVE_MESSAGE = 'Save new dosimeter points?'
+    def name(self):
+        return 'Add dosimetry sample points'
+    def is_available(self):
+        return has_at_least(self.get_extent_pois(), 2)
+    def get_extent_pois(self):
+        return self.docs.get_pois(
+            type='m',
+            suitability_function=suitable
+        )
+    def get_existing_pois(self):
+        return self.docs.get_pois(
+            type='dosi',
+            suitability_function=suitable
+        )
+    def adjust_points(self):
+        (xmin, xmax, ymin, ymax, z) = extent_from_pois(self.get_extent_pois())
+        window = Zen.Windows.CreateWindow('Choose a layout')
+        if has_at_least(self.get_existing_pois(), 4):
+            window.AddLabel('This operation will delete your existing uncaptured sample points')
+        window.AddIntegerRange('row_count', 'Number of rows', 5, 2, 10)
+        window.AddIntegerRange('column_count', 'Number of columns', 4, 2, 10)
+        result = window.Show()
+        if result.HasCanceled:
+            return None
+        row_count = result.GetValue('row_count')
+        yd = (ymax - ymin) / row_count
+        ys = [
+            (r + 0.5) * yd + ymin
+            for r in range(row_count)
+        ]
+        column_count = result.GetValue('column_count')
+        xd = (xmax - xmin) / column_count
+        xs = [
+            (c + 0.5) * xd + xmin
+            for c in range(column_count)
+        ]
+        return set_poi_grid(self.docs, xs, ys, z, 'dosi', self.get_existing_pois())
 
 class SurfaceFocusPointsTask(AdjustPointsTask):
     LAYOUT_OPTIONS = {
@@ -1116,28 +1389,11 @@ class SurfaceFocusPointsTask(AdjustPointsTask):
             ymid - half_height * math.cos((n + 0.5) * dtheta)
             for n in range(self.rows)
         ]
-        pois = []
         existing_pois = self.docs.get_pois(
             type=self.POI_TYPE,
             suitability_function=all_points
         )
-        for y in ys:
-            for x in xs:
-                try:
-                    poi = next(existing_pois)
-                    poi.x = x
-                    poi.y = y
-                    poi.z = z
-                    poi.name = ''
-                    pois.append(poi)
-                except StopIteration:
-                    pois.append(self.docs.new_poi(
-                        self.POI_TYPE, x, y, z, ''
-                    ))
-            xs.reverse()
-        for poi in existing_pois:
-            poi.name = '# Unsuitable'
-        return pois
+        return set_poi_grid(self.docs, xs, ys, z, self.POI_TYPE, existing_pois)
     def get_extent_pois(self):
         return self.docs.get_pois(self.EXTENT_POI_TYPE)
     def is_available(self):
@@ -1552,6 +1808,7 @@ def acquire_stack(parameters, folder, prefix=''):
     Zen.Devices.Focus.MoveTo(focus)
 
 class CaptureZStacksTask(Task):
+    POI_TYPE = 'i'
     FILE_PREFIX = ''
     MAX_FAILURES = 3
     EXPERIMENT_NAME = coarse_focus_experiment_name
@@ -1588,7 +1845,10 @@ class CaptureZStacksTask(Task):
     def get_pois(self):
         return [
             p
-            for p in self.docs.get_pois('i', suitability_function=suitable)
+            for p in self.docs.get_pois(
+                self.POI_TYPE,
+                suitability_function=suitable
+            )
             if self.poi_is_ok(p)
         ]
     def get_focus_position(self):
@@ -1690,6 +1950,13 @@ class CaptureMineralZStacksTask(CaptureZStacksTask):
         for poi in pois:
             poi.name = ''
 
+class CaptureDosimetryZStacksTask(CaptureMineralZStacksTask):
+    POI_TYPE = 'dosi'
+    REGISTRATION_MATRIX_FILE_NAME = 'dosi_matrix.csv'
+    FAILURE_MESSAGE = 'Too many failures! Try running the Adjust existing dosimetry sample points task'
+    def name(self):
+        return 'Capture dosimetry Z-Stacks'
+
 class CaptureMicaZStacksTask(CaptureZStacksTask):
     REGISTRATION_MATRIX_FILE_NAME = 'mica_matrix.csv'
     FILE_PREFIX = 'Mica'
@@ -1787,8 +2054,11 @@ def run_a_task(folder):
         ResurrectUnsuitableWithMicaTask,
         GetMicaMatrixTask,
         ManimalPoiTask,
+        AddDosimetrySamplePointsTask,
+        AdjustDosimetrySamplePointsTask,
         CaptureMineralZStacksTask,
         CaptureMicaZStacksTask,
+        CaptureDosimetryZStacksTask,
         MakeMapTask,
         RefreshTask,
     ]
@@ -1823,6 +2093,6 @@ while run_a_task(folder):
   <Author></Author>
   <Description></Description>
   <Keywords></Keywords>
-  <Row>1093</Row>
-  <Column>22</Column>
+  <Row>1261</Row>
+  <Column>28</Column>
 </Script>
