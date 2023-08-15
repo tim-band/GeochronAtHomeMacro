@@ -857,6 +857,7 @@ class AdjustMicaMatrixForm(AdjustMatrixForm):
             ZenThirdProcessingDimension.None,
             False
         )
+        grain.Close()
         rotated = Zen.Processing.Transformation.Geometric.Rotate2D(
             mirror_grain,
             ZenInterpolation.NearestNeighbour,
@@ -866,6 +867,7 @@ class AdjustMicaMatrixForm(AdjustMatrixForm):
             False
         )
         mbounds = mirror_grain.Bounds
+        mirror_grain.Close()
         rbounds = rotated.Bounds
         startX = (rbounds.SizeX - mbounds.SizeX) / 2
         startY = (rbounds.SizeY - mbounds.SizeY) / 2
@@ -875,6 +877,7 @@ class AdjustMicaMatrixForm(AdjustMatrixForm):
             startY,
             startY + mbounds.SizeY - 1
         ))
+        rotated.Close()
         cx = mbounds.SizeX / 2
         cy = mbounds.SizeY / 2
         # Add a crosshair to the grain image to show where the centre is
@@ -902,13 +905,14 @@ class AdjustMicaMatrixForm(AdjustMatrixForm):
         circle.Thickness = 4.3
         circle.StrokeColor = ZenColors.Blue
         self.rotated_grain = cropped.BurnInGraphics()
+        cropped.Close()
         Zen.Application.Documents.Add(self.rotated_grain)
         zen.show_live()
         super(AdjustMicaMatrixForm, self).drive(poi, count, total_count)
         micaZ = poi.micaZ
         if micaZ is not None:
             self.current_focus = micaZ
-        elif 3 &lt;= self.focus_estimator.count():
+        elif 10 &lt;= self.focus_estimator.count(): # at least 3 points required, but maybe more is better
             self.current_focus = self.focus_estimator.estimate_z(
                 Zen.Devices.Stage.ActualPositionX,
                 Zen.Devices.Stage.ActualPositionY
@@ -1589,7 +1593,9 @@ class AdjustMicaMatrixTask(RegistrationTask):
     def name(self):
         return 'Fine tune mica transformation'
     def get_pois(self):
-        return self.docs.get_pois('i', suitable)
+        ps = list(self.docs.get_pois('i', suitable))
+        random.shuffle(ps)
+        return ps
     def is_available(self):
         return has_at_least(self.get_pois(), 2) and self.docs.matrix
     def do(self):
@@ -1685,6 +1691,8 @@ class GetMicaMatrixTask(Task):
             'python',
             '-m',
             'manimal',
+            '-p',
+            'poi.csv',
             '-m',
             'matrix.csv',
             '-f',
@@ -2093,6 +2101,6 @@ while run_a_task(folder):
   <Author></Author>
   <Description></Description>
   <Keywords></Keywords>
-  <Row>1261</Row>
-  <Column>28</Column>
+  <Row>37</Row>
+  <Column>18</Column>
 </Script>
