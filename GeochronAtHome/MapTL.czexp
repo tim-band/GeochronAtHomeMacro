@@ -28,6 +28,8 @@
     <SingleFileName>New</SingleFileName>
     <DimensionsForSeparateFolders>-C;-T;-Z;-S</DimensionsForSeparateFolders>
     <IndexedName Name="Image" NumberOfDigits="4" Format="%N" IsIndexPersisted="true" CurrentIndex="1" />
+    <RegisterInDataStorage>false</RegisterInDataStorage>
+    <DataStorageCollectionId>00000000-0000-0000-0000-000000000000</DataStorageCollectionId>
   </AutoSave>
   <Scripting IsActivated="false">
     <RunMacroBeforeExperiment>false</RunMacroBeforeExperiment>
@@ -80,9 +82,16 @@
             <UseDefaultSurfaceFit>true</UseDefaultSurfaceFit>
             <UsedSurfaceFitTypeName></UsedSurfaceFitTypeName>
             <DelayAfterStageMove>0</DelayAfterStageMove>
+            <SelectedSupportPointDistributionMode>Grid</SelectedSupportPointDistributionMode>
+            <SupportPointColumns>2</SupportPointColumns>
+            <SupportPointRows>2</SupportPointRows>
+            <OnionSkinDistributionDensity>0.05</OnionSkinDistributionDensity>
+            <OnionSkinDistributionMargin>1</OnionSkinDistributionMargin>
+            <OnionSkinDistributionMaxPoints>24</OnionSkinDistributionMaxPoints>
+            <AreSupportPointsAutomaticallyDistributedForNewTileRegions>false</AreSupportPointsAutomaticallyDistributedForNewTileRegions>
             <TileDimension>
-              <Width>2498.816</Width>
-              <Height>2004.864</Height>
+              <Width>1249.408</Width>
+              <Height>1002.432</Height>
               <CenterOffsetX>0</CenterOffsetX>
               <CenterOffsetY>0</CenterOffsetY>
             </TileDimension>
@@ -133,9 +142,9 @@
                           <CameraFrameSetup Id="MTBCamera_MTBTube_Cameraport.Axiocam506c">
                             <ShadingReference IsActivated="true">false</ShadingReference>
                             <ShadingReferenceSource IsActivated="true">1</ShadingReferenceSource>
-                            <ExposureTime Status="Valid" IsActivated="true">100</ExposureTime>
+                            <ExposureTime Status="Valid" IsActivated="true">22</ExposureTime>
                             <Adjust Status="Valid" IsActivated="true">0.7</Adjust>
-                            <AutoExposure Status="Valid" IsActivated="true">false</AutoExposure>
+                            <AutoExposure Status="Valid" IsActivated="true">true</AutoExposure>
                           </CameraFrameSetup>
                         </DataGrabberSetup>
                         <ContrastMethod>
@@ -205,6 +214,7 @@
               <Interval>0</Interval>
               <IntervalUnit>ms</IntervalUnit>
               <MarkerDescription></MarkerDescription>
+              <Cycles>1</Cycles>
             </Manual>
           </StartMode>
           <StopMode>
@@ -223,6 +233,7 @@
               <Interval>0</Interval>
               <IntervalUnit>ms</IntervalUnit>
               <MarkerDescription></MarkerDescription>
+              <Cycles>1</Cycles>
             </Manual>
           </StopMode>
           <PauseBeginMode>
@@ -241,6 +252,7 @@
               <Interval>0</Interval>
               <IntervalUnit>ms</IntervalUnit>
               <MarkerDescription></MarkerDescription>
+              <Cycles>1</Cycles>
             </Manual>
           </PauseBeginMode>
           <PauseEndMode>
@@ -259,6 +271,7 @@
               <Interval>0</Interval>
               <IntervalUnit>ms</IntervalUnit>
               <MarkerDescription></MarkerDescription>
+              <Cycles>1</Cycles>
             </Manual>
           </PauseEndMode>
           <StartNextTimeSliceMode>
@@ -277,6 +290,7 @@
               <Interval>0</Interval>
               <IntervalUnit>ms</IntervalUnit>
               <MarkerDescription></MarkerDescription>
+              <Cycles>1</Cycles>
             </Manual>
           </StartNextTimeSliceMode>
           <TimeSeriesTriggerIntervalModeCollection />
@@ -363,7 +377,7 @@
             </Calibration>
             <IsHolderEnabled>true</IsHolderEnabled>
             <HolderNumber />
-            <CorrelativeSessionId>2899b70f-9008-4917-b9ec-b91940dddb41</CorrelativeSessionId>
+            <CorrelativeSessionId>e420b9d7-1801-4dec-8565-79448a37e8c8</CorrelativeSessionId>
           </HolderDocument>
           <SubDimensionSetups />
         </CorrelativeSetup>
@@ -375,7 +389,7 @@
             <Detector Id="MTBCamera_MTBTube_Cameraport.Axiocam506c">
               <ApplyCameraProfile Status="Valid">false</ApplyCameraProfile>
               <ApplyImageOrientation Status="Valid">true</ApplyImageOrientation>
-              <ExposureTime Status="Valid">100</ExposureTime>
+              <ExposureTime Status="Valid">22</ExposureTime>
               <Frame Status="Valid">0,0,2752,2208</Frame>
               <ImageOrientation Status="Valid">1</ImageOrientation>
               <ContinuousAcquisitionSafeMode Status="Valid">true</ContinuousAcquisitionSafeMode>
@@ -405,13 +419,13 @@
               <Adjust Status="Valid">0.7</Adjust>
               <AdjustFrameRate Status="Valid">true</AdjustFrameRate>
               <AutoExposure Status="Valid">false</AutoExposure>
-              <AutoExposureFrame Status="Valid">803,560,1147,1087</AutoExposureFrame>
+              <AutoExposureFrame Status="Valid">794,589,1147,1087</AutoExposureFrame>
               <Binning Status="Valid">1,1</Binning>
               <BlackReference Status="Valid">false</BlackReference>
               <DefaultDisplayGamma Status="Valid">0.45</DefaultDisplayGamma>
               <DeliverExactFrame Status="Valid">false</DeliverExactFrame>
               <DualCameraCalibration Status="Valid">false</DualCameraCalibration>
-              <DualCameraCalibrationId Status="Valid">None</DualCameraCalibrationId>
+              <DualCameraCalibrationId Status="Valid"></DualCameraCalibrationId>
               <ExposureDelay Status="Valid">0</ExposureDelay>
               <CalculateExposureMaximum Status="Valid">10000</CalculateExposureMaximum>
               <AutoExposureTolerance Status="Valid">0.05</AutoExposureTolerance>
@@ -453,6 +467,19 @@
               <AutomaticTriggerControl Status="Valid">true</AutomaticTriggerControl>
               <SuppressTemperatureWarnings Status="Valid">false</SuppressTemperatureWarnings>
               <AdaptExposureByBinningChange Status="Valid">false</AdaptExposureByBinningChange>
+              <MultiThreadedAcquisition Status="Valid">false</MultiThreadedAcquisition>
+              <FrameBufferMaxCacheSizeByte Status="Valid">1073741824</FrameBufferMaxCacheSizeByte>
+              <FrameBufferMinCacheSizeByte Status="Valid">524288000</FrameBufferMinCacheSizeByte>
+              <CameraExtraControlCommandName Status="Valid"></CameraExtraControlCommandName>
+              <NoiseFilterWithIPP Status="Valid">false</NoiseFilterWithIPP>
+              <CenteredYFrame Status="Valid">false</CenteredYFrame>
+              <ImageOrientationWithIPP Status="Valid">true</ImageOrientationWithIPP>
+              <AutoExposureChannel Status="Valid">1</AutoExposureChannel>
+              <ReadoutTime Status="Valid">50.052</ReadoutTime>
+              <ApplyParametersCommand Status="Valid"></ApplyParametersCommand>
+              <ResetDecoderCache Status="Valid"></ResetDecoderCache>
+              <CacheDecoder Status="Valid">false</CacheDecoder>
+              <Rotation Status="Valid">0</Rotation>
             </Detector>
           </Detectors>
           <Devices />
@@ -468,10 +495,6 @@
         <AutoImmersionSetup IsActivated="false">
           <ImmersionTimeInterval>0</ImmersionTimeInterval>
           <ImmersionTravelDistance>0</ImmersionTravelDistance>
-          <IsBubbleEliminationMovementEnabled>false</IsBubbleEliminationMovementEnabled>
-          <BubbleEliminationMovementTargetX>20000</BubbleEliminationMovementTargetX>
-          <BubbleEliminationMovementTargetY>20000</BubbleEliminationMovementTargetY>
-          <SchedulingStrategy>PauseExperimentSchedulingStrategy</SchedulingStrategy>
         </AutoImmersionSetup>
         <BleachingSetup IsActivated="false">
           <BleachSettingsName>Not Defined</BleachSettingsName>
@@ -547,6 +570,8 @@
             <AutofocusPositionOffset>0</AutofocusPositionOffset>
             <AutofocusOperationMode>Exact</AutofocusOperationMode>
             <AutofocusSpecimenType>Reflective</AutofocusSpecimenType>
+            <AutofocusSearchRange>0</AutofocusSearchRange>
+            <AutofocusSearchRegionRect></AutofocusSearchRegionRect>
           </HardwareAutofocus>
           <SoftwareAutofocus>
             <ReflectionMode>Disabled</ReflectionMode>
@@ -558,7 +583,7 @@
               <DY>0.49230072463768115</DY>
             </AutofocusRegion>
             <BacklashStepsize>2</BacklashStepsize>
-            <DepthOfFocus>46.04</DepthOfFocus>
+            <DepthOfFocus>12.45</DepthOfFocus>
             <DoBleachingCorrection>true</DoBleachingCorrection>
             <InitialDirection>0</InitialDirection>
             <IsAutomaticRange>false</IsAutomaticRange>
@@ -644,15 +669,23 @@
         </TempSeriesSetup>
         <ExperimentRemoteProcessingSetup IsActivated="false">
           <ProcessingSteps>
-            <ProcessingStep Id="NULL" />
+            <ProcessingStep Id="Deconvolution">
+              <Algorithm>FastIterative</Algorithm>
+              <UseAdvancedSettings>false</UseAdvancedSettings>
+              <AdvancedSettingsFilePath></AdvancedSettingsFilePath>
+            </ProcessingStep>
           </ProcessingSteps>
           <OutputFolder>d:\zeiss\Pictures</OutputFolder>
           <IsAutoSubFolder>false</IsAutoSubFolder>
           <FileName>processed.czi</FileName>
           <IncludeOriginalFileName>true</IncludeOriginalFileName>
+          <ProcessOnRemotePc>false</ProcessOnRemotePc>
           <SyncAutoSaveFolderToOutputFolder>true</SyncAutoSaveFolderToOutputFolder>
+          <RemoveAcquiredImage>false</RemoveAcquiredImage>
           <ProcessedImageHandling>AutoOpenWhenFinished</ProcessedImageHandling>
+          <SplitDimension>None</SplitDimension>
         </ExperimentRemoteProcessingSetup>
+        <InstrumentationHelperSetup IsActivated="false" />
       </HelperSetups>
     </AcquisitionBlock>
   </ExperimentBlocks>
@@ -694,6 +727,6 @@
   </ExperimentFeedback>
   <AdditionalSettings />
   <Metadata>
-    <ExperimentDuration></ExperimentDuration>
+    <ExperimentDuration>00:00:03s</ExperimentDuration>
   </Metadata>
 </HardwareExperiment>

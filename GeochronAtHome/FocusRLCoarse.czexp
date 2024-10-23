@@ -28,6 +28,8 @@
     <SingleFileName>New</SingleFileName>
     <DimensionsForSeparateFolders>-C;-T;-Z;-S</DimensionsForSeparateFolders>
     <IndexedName Name="Image" NumberOfDigits="4" Format="%N" IsIndexPersisted="true" CurrentIndex="1" />
+    <RegisterInDataStorage>false</RegisterInDataStorage>
+    <DataStorageCollectionId>00000000-0000-0000-0000-000000000000</DataStorageCollectionId>
   </AutoSave>
   <Scripting IsActivated="false">
     <RunMacroBeforeExperiment>false</RunMacroBeforeExperiment>
@@ -80,9 +82,16 @@
             <UseDefaultSurfaceFit>true</UseDefaultSurfaceFit>
             <UsedSurfaceFitTypeName></UsedSurfaceFitTypeName>
             <DelayAfterStageMove>0</DelayAfterStageMove>
+            <SelectedSupportPointDistributionMode>Grid</SelectedSupportPointDistributionMode>
+            <SupportPointColumns>2</SupportPointColumns>
+            <SupportPointRows>2</SupportPointRows>
+            <OnionSkinDistributionDensity>0.05</OnionSkinDistributionDensity>
+            <OnionSkinDistributionMargin>1</OnionSkinDistributionMargin>
+            <OnionSkinDistributionMaxPoints>24</OnionSkinDistributionMaxPoints>
+            <AreSupportPointsAutomaticallyDistributedForNewTileRegions>false</AreSupportPointsAutomaticallyDistributedForNewTileRegions>
             <TileDimension>
-              <Width>124.9408</Width>
-              <Height>100.2432</Height>
+              <Width>1249.408</Width>
+              <Height>1002.432</Height>
               <CenterOffsetX>0</CenterOffsetX>
               <CenterOffsetY>0</CenterOffsetY>
             </TileDimension>
@@ -123,7 +132,7 @@
                             <ShadingReference IsActivated="true">false</ShadingReference>
                             <ShadingReferenceSource IsActivated="true">1</ShadingReferenceSource>
                             <ExposureTime IsActivated="true">46</ExposureTime>
-                            <AutoExposure IsActivated="true">false</AutoExposure>
+                            <AutoExposure IsActivated="true">true</AutoExposure>
                           </CameraFrameSetup>
                         </DataGrabberSetup>
                         <FluorescenceDye>
@@ -134,7 +143,7 @@
                           <ContrastMethods>ReflectedLightFluorescence</ContrastMethods>
                           <ContrastTypes>Unknown</ContrastTypes>
                           <Color>#FFD3D3D3</Color>
-                          <dye_id>Dye58E9B5A6</dye_id>
+                          <dye_id>Dye637AFBC7</dye_id>
                           <collection_id>00000000-0000-0000-0000-000000000000</collection_id>
                         </FluorescenceDye>
                       </Channel>
@@ -225,6 +234,7 @@
               <Interval>0</Interval>
               <IntervalUnit>ms</IntervalUnit>
               <MarkerDescription></MarkerDescription>
+              <Cycles>1</Cycles>
             </Manual>
           </StartMode>
           <StopMode>
@@ -243,6 +253,7 @@
               <Interval>0</Interval>
               <IntervalUnit>ms</IntervalUnit>
               <MarkerDescription></MarkerDescription>
+              <Cycles>1</Cycles>
             </Manual>
           </StopMode>
           <PauseBeginMode>
@@ -261,6 +272,7 @@
               <Interval>0</Interval>
               <IntervalUnit>ms</IntervalUnit>
               <MarkerDescription></MarkerDescription>
+              <Cycles>1</Cycles>
             </Manual>
           </PauseBeginMode>
           <PauseEndMode>
@@ -279,6 +291,7 @@
               <Interval>0</Interval>
               <IntervalUnit>ms</IntervalUnit>
               <MarkerDescription></MarkerDescription>
+              <Cycles>1</Cycles>
             </Manual>
           </PauseEndMode>
           <StartNextTimeSliceMode>
@@ -297,6 +310,7 @@
               <Interval>0</Interval>
               <IntervalUnit>ms</IntervalUnit>
               <MarkerDescription></MarkerDescription>
+              <Cycles>1</Cycles>
             </Manual>
           </StartNextTimeSliceMode>
           <TimeSeriesTriggerIntervalModeCollection />
@@ -353,7 +367,7 @@
             </Calibration>
             <IsHolderEnabled>true</IsHolderEnabled>
             <HolderNumber />
-            <CorrelativeSessionId>6e58abe6-b522-476c-a5af-7fdb71348629</CorrelativeSessionId>
+            <CorrelativeSessionId>e420b9d7-1801-4dec-8565-79448a37e8c8</CorrelativeSessionId>
           </HolderDocument>
           <SubDimensionSetups />
         </CorrelativeSetup>
@@ -443,6 +457,19 @@
               <AutomaticTriggerControl Status="Valid">true</AutomaticTriggerControl>
               <SuppressTemperatureWarnings Status="Valid">false</SuppressTemperatureWarnings>
               <AdaptExposureByBinningChange Status="Valid">false</AdaptExposureByBinningChange>
+              <MultiThreadedAcquisition Status="Valid">false</MultiThreadedAcquisition>
+              <FrameBufferMaxCacheSizeByte Status="Valid">1073741824</FrameBufferMaxCacheSizeByte>
+              <FrameBufferMinCacheSizeByte Status="Valid">524288000</FrameBufferMinCacheSizeByte>
+              <CameraExtraControlCommandName Status="Valid"></CameraExtraControlCommandName>
+              <NoiseFilterWithIPP Status="Valid">false</NoiseFilterWithIPP>
+              <CenteredYFrame Status="Valid">false</CenteredYFrame>
+              <ImageOrientationWithIPP Status="Valid">true</ImageOrientationWithIPP>
+              <AutoExposureChannel Status="Valid">1</AutoExposureChannel>
+              <ReadoutTime Status="Valid">50.052</ReadoutTime>
+              <ApplyParametersCommand Status="Valid"></ApplyParametersCommand>
+              <ResetDecoderCache Status="Valid"></ResetDecoderCache>
+              <CacheDecoder Status="Valid">false</CacheDecoder>
+              <Rotation Status="Valid">0</Rotation>
             </Detector>
           </Detectors>
           <Devices />
@@ -458,10 +485,6 @@
         <AutoImmersionSetup IsActivated="false">
           <ImmersionTimeInterval>0</ImmersionTimeInterval>
           <ImmersionTravelDistance>0</ImmersionTravelDistance>
-          <IsBubbleEliminationMovementEnabled>false</IsBubbleEliminationMovementEnabled>
-          <BubbleEliminationMovementTargetX>20000</BubbleEliminationMovementTargetX>
-          <BubbleEliminationMovementTargetY>20000</BubbleEliminationMovementTargetY>
-          <SchedulingStrategy>PauseExperimentSchedulingStrategy</SchedulingStrategy>
         </AutoImmersionSetup>
         <BleachingSetup IsActivated="false">
           <BleachSettingsName>Not Defined</BleachSettingsName>
@@ -537,6 +560,8 @@
             <AutofocusPositionOffset>0</AutofocusPositionOffset>
             <AutofocusOperationMode>Exact</AutofocusOperationMode>
             <AutofocusSpecimenType>Reflective</AutofocusSpecimenType>
+            <AutofocusSearchRange>0</AutofocusSearchRange>
+            <AutofocusSearchRegionRect></AutofocusSearchRegionRect>
           </HardwareAutofocus>
           <SoftwareAutofocus>
             <ReflectionMode>Disabled</ReflectionMode>
@@ -548,7 +573,7 @@
               <DY>0.49230072463768115</DY>
             </AutofocusRegion>
             <BacklashStepsize>2</BacklashStepsize>
-            <DepthOfFocus>0.35</DepthOfFocus>
+            <DepthOfFocus>4.53</DepthOfFocus>
             <DoBleachingCorrection>true</DoBleachingCorrection>
             <InitialDirection>0</InitialDirection>
             <IsAutomaticRange>false</IsAutomaticRange>
@@ -634,15 +659,23 @@
         </TempSeriesSetup>
         <ExperimentRemoteProcessingSetup IsActivated="false">
           <ProcessingSteps>
-            <ProcessingStep Id="NULL" />
+            <ProcessingStep Id="Deconvolution">
+              <Algorithm>FastIterative</Algorithm>
+              <UseAdvancedSettings>false</UseAdvancedSettings>
+              <AdvancedSettingsFilePath></AdvancedSettingsFilePath>
+            </ProcessingStep>
           </ProcessingSteps>
           <OutputFolder>d:\zeiss\Pictures</OutputFolder>
           <IsAutoSubFolder>false</IsAutoSubFolder>
           <FileName>processed.czi</FileName>
           <IncludeOriginalFileName>true</IncludeOriginalFileName>
+          <ProcessOnRemotePc>false</ProcessOnRemotePc>
           <SyncAutoSaveFolderToOutputFolder>true</SyncAutoSaveFolderToOutputFolder>
+          <RemoveAcquiredImage>false</RemoveAcquiredImage>
           <ProcessedImageHandling>AutoOpenWhenFinished</ProcessedImageHandling>
+          <SplitDimension>None</SplitDimension>
         </ExperimentRemoteProcessingSetup>
+        <InstrumentationHelperSetup IsActivated="false" />
       </HelperSetups>
     </AcquisitionBlock>
   </ExperimentBlocks>
@@ -697,4 +730,7 @@
     <Actions />
   </ExperimentFeedback>
   <AdditionalSettings />
+  <Metadata>
+    <ExperimentDuration>00:00:03s</ExperimentDuration>
+  </Metadata>
 </HardwareExperiment>

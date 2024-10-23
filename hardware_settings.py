@@ -30,7 +30,7 @@
 },
 'transmitted': {
     'MTBTLHalogenLamp': {
-        'Intensity': 10.8
+        'Intensity': 50.0
     },
     'MTBRLHalogenLamp': {
         'LampMode': 'Standby'

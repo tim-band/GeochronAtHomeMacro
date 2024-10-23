@@ -11,6 +11,12 @@ import os
 import random
 import xml.etree.ElementTree as ET
 
+import traceback
+
+import hardware_settings
+
+reload(hardware_settings)
+
 class UserCancelledException(Exception):
     pass
 
@@ -78,6 +84,21 @@ class Workarounds:
             self.zeiss.Micro.Scripting.Research.ZenToolTab.AcquisitionTab
         )
 
+    def make_hardware_setting(self, name):
+        """
+        Returns a ZenHardwareSetting object constructed from the data
+        in the hardware_settings.py module, which are designed to work
+        well with the experiments in the Macros/GeochronAtHome
+        directory. This saves us from having to look after extra files
+        in Macros/GeochronAtHome while making the settings easy to
+        edit.
+        """
+        hs = self.zeiss.Micro.Scripting.ZenHardwareSetting()
+        for (id, ps) in hardware_settings.settings[name].items():
+            for (param, value) in ps.items():
+                hs.SetParameter(id, param, value)
+        return hs
+
     def set_hardware(self, hardware_setting=None, camera_setting=None):
         """
         Set hardware and/or camera setting
@@ -110,14 +131,38 @@ class Workarounds:
             return e
         return experiment
 
+    def set_standard_hardware_settings(self):
+        for (name, setting) in hardware_settings.settings.items():
+            rltl = self.zen.Devices.HardwareSettings.ActiveHardwareSetting.GetParameter('MTBRLTLSwitch', 'PositionName')
+            if rltl == setting['MTBRLTLSwitch']['PositionName']:
+                hs = self.make_hardware_setting(name)
+                self.set_hardware(hardware_setting=hs)
+                return
+
+    def do_start_live_experiment(self, experiment):
+        for i in range(3):
+            live = None
+            try:
+                live = self.zen.Acquisition.StartLive(experiment)
+                if live is not None:
+                    return live
+            except:
+                pass
+            self.zen.Acquisition.StopLive()
+        return None
+
     def show_live(self, experiment=None):
         self.switch_to_locate_tab()
-        live = self.zen.Acquisition.StartLive()
         if experiment is not None:
             self.switch_to_acquisition_tab()
-            live = self.zen.Acquisition.StartLive(
+            live = self.do_start_live_experiment(
+            #live = self.zen.Acquisition.StartLive(
                 self.get_experiment(experiment)
             )
+        else:
+            self.set_standard_hardware_settings()
+            live = self.zen.Acquisition.StartLive()
+            self.zen.Acquisition.AutoExposure()
         self.zen.Application.Documents.ActiveDocument = live
         return live
 

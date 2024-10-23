@@ -33,7 +33,6 @@
 # Exit
 
 import glob
-import hardware_settings
 import linear
 import math
 import os
@@ -43,7 +42,6 @@ import subprocess
 import time
 import workarounds
 
-reload(hardware_settings)
 reload(linear)
 reload(workarounds)
 
@@ -117,26 +115,14 @@ camera_setting.SetParameter("ColorSaturation", 0.5)
 
 def setExposureTime(ms):
     """ Sets the exposure time of the camera hardware. """
+    if ms is None:
+        Zen.Acquisition.AutoExposure()
+        return
     camera_setting.SetParameter("ExposureTime", ms)
     Zen.Acquisition.ActiveCamera.ApplyCameraSetting(camera_setting)
 
-def makeHardwareSetting(name):
-    """
-    Returns a ZenHardwareSetting object constructed from the data
-    in the hardware_settings.py module, which are designed to work
-    well with the experiments in the Macros/GeochronAtHome
-    directory. This saves us from having to look after extra files
-    in Macros/GeochronAtHome while making the settings easy to
-    edit.
-    """
-    hs = ZenHardwareSetting()
-    for (id, ps) in hardware_settings.settings[name].items():
-        for (param, value) in ps.items():
-            hs.SetParameter(id, param, value)
-    return hs
-
-hs_reflected = makeHardwareSetting('reflected')
-hs_transmitted = makeHardwareSetting('transmitted')
+hs_reflected = zen.make_hardware_setting('reflected')
+hs_transmitted = zen.make_hardware_setting('transmitted')
 
 class UserCancelledException(Exception):
     pass
@@ -268,7 +254,10 @@ def removeNones(array):
 
 class AdjustForm(SelectForm):
     """
-    Form suitable for adjusting points. Can be used with `with`.
+    Form suitable for adjusting points.
+
+    Use in a `with` statement to ensure it gets
+    cleaned up properly.
     """
     OK = 'set to current position and focus'
     LEAVE = 'leave as it is'
@@ -649,7 +638,6 @@ class Documents(object):
         """
         (x,y) = linear.transform(self.matrix, p.x, p.y)
         self.drive_to_xyz(x, y, z=p.micaZ)
-        zen.show_live()
     def stage_position(self):
         """
         Returns the stage position in project coordinates, that
@@ -784,7 +772,7 @@ class AdjustPoiForm(AdjustForm):
     Can be used with `with`.
     """
     HARDWARE_SETTING = hs_transmitted
-    EXPOSURE_TIME_MS = 100
+    EXPOSURE_TIME_MS = 22
     def __init__(self, pois, docs):
         super(AdjustPoiForm, self).__init__(pois)
         self.docs = docs
@@ -809,7 +797,7 @@ class AdjustMatrixForm(AdjustForm):
     EXIT_KEEP = 'exit, ignoring remaining points'
     EXIT_MARK_ALL = 'exit and mark remaining POIs as unsuitable'
     HARDWARE_SETTING = hs_transmitted
-    EXPOSURE_TIME_MS = 100
+    EXPOSURE_TIME_MS = 22
     FLIP = 1
     def __init__(self, pois, docs):
         super(AdjustMatrixForm, self).__init__(pois)
@@ -1116,6 +1104,9 @@ def count(seq):
     return n
 
 class Task(object):
+    # None means "use AutoExposure"
+    EXPOSURE_TIME_RL = None  # was 100
+    EXPOSURE_TIME_TL = None  # was 100
     """
     An option for the user to choose from in the task list.
     Tasks know if they are available (if all of thier inputs
@@ -1793,29 +1784,11 @@ class MakeMapTask(CreateTiledImageTask):
         image = Zen.Application.LoadImage(path)
         Zen.Application.Documents.Add(image)
 
-def acquire_stack(parameters, folder, prefix=''):
-    rl_slice_start = -parameters['rl_slice_above']
-    rl_slice_end = parameters['rl_slice_below']
-    rl_interval = parameters['rl_interval']
-    tl_slice_start = -parameters['tl_slice_above']
-    tl_slice_end = parameters['tl_slice_below']
-    tl_interval = parameters['tl_interval']
-    focus = Zen.Devices.Focus.ActualPosition
-    zen.set_hardware(hs_reflected)
-    setExposureTime(100)
-    for i in range(rl_slice_start, rl_slice_end):
-        Zen.Devices.Focus.MoveTo(focus + i * rl_interval)
-        im = Zen.Acquisition.AcquireImage()
-        im.Save(os.path.join(folder, "{1}ReflStack-{0:02d}.jpg".format(i, prefix)), 80)
-    zen.set_hardware(hs_transmitted)
-    setExposureTime(100)
-    for i in range(tl_slice_start, tl_slice_end):
-        Zen.Devices.Focus.MoveTo(focus + i * tl_interval)
-        im = Zen.Acquisition.AcquireImage()
-        im.Save(os.path.join(folder, "{1}Stack-{0:02d}.jpg".format(i, prefix)), 80)
-    Zen.Devices.Focus.MoveTo(focus)
 
 class CaptureZStacksTask(Task):
+    """
+    Base class for all the Tasks that capture Z-stacks
+    """
     POI_TYPE = 'i'
     FILE_PREFIX = ''
     MAX_FAILURES = 3
@@ -1848,6 +1821,29 @@ class CaptureZStacksTask(Task):
         ]:
             r[k] = result.GetValue(k)
         return r
+
+    def acquire_stack(self, parameters, folder, prefix=''):
+        rl_slice_start = -parameters['rl_slice_above']
+        rl_slice_end = parameters['rl_slice_below']
+        rl_interval = parameters['rl_interval']
+        tl_slice_start = -parameters['tl_slice_above']
+        tl_slice_end = parameters['tl_slice_below']
+        tl_interval = parameters['tl_interval']
+        focus = Zen.Devices.Focus.ActualPosition
+        zen.set_hardware(hs_reflected)
+        setExposureTime(self.EXPOSURE_TIME_RL)
+        for i in range(rl_slice_start, rl_slice_end):
+            Zen.Devices.Focus.MoveTo(focus + i * rl_interval)
+            im = Zen.Acquisition.AcquireImage()
+            im.Save(os.path.join(folder, "{1}ReflStack-{0:02d}.jpg".format(i, prefix)), 80)
+        zen.set_hardware(hs_transmitted)
+        setExposureTime(self.EXPOSURE_TIME_TL)
+        for i in range(tl_slice_start, tl_slice_end):
+            Zen.Devices.Focus.MoveTo(focus + i * tl_interval)
+            im = Zen.Acquisition.AcquireImage()
+            im.Save(os.path.join(folder, "{1}Stack-{0:02d}.jpg".format(i, prefix)), 80)
+        Zen.Devices.Focus.MoveTo(focus)
+    
     def poi_is_ok(self, poi):
         return True
     def get_pois(self):
@@ -1875,8 +1871,7 @@ class CaptureZStacksTask(Task):
         zen.autofocus(self.FINE_FOCUS_EXPERIMENT_NAME)
     def manual_focus(self, poi):
         zen.set_hardware(hs_reflected)
-        zen.show_live()
-        setExposureTime(100)
+        setExposureTime(None)
         Zen.Application.Pause('Please focus manually')
     def drive_to(self, poi):
         self.docs.drive_to_poi(poi)
@@ -1914,7 +1909,7 @@ class CaptureZStacksTask(Task):
                             self.auto_focus(poi)
                         elif parameters['extra_focus'] == 'Manual':
                             self.manual_focus(poi)
-                        acquire_stack(parameters, grain_folder, self.FILE_PREFIX)
+                        self.acquire_stack(parameters, grain_folder, self.FILE_PREFIX)
                         self.docs.save_current_matrix_as(os.path.join(
                             grain_folder, self.REGISTRATION_MATRIX_FILE_NAME
                         ))
@@ -1966,6 +1961,11 @@ class CaptureDosimetryZStacksTask(CaptureMineralZStacksTask):
         return 'Capture dosimetry Z-Stacks'
 
 class CaptureMicaZStacksTask(CaptureZStacksTask):
+    """
+    Captures Mica Z-Stacks for all points where Minerals Z-Stacks have already
+    been captured. This ensures that all Z-stack folders have Minerals Z-Stacks
+    in them, which seems to be a good idea to prevent confusion.
+    """
     REGISTRATION_MATRIX_FILE_NAME = 'mica_matrix.csv'
     FILE_PREFIX = 'Mica'
     FAILURE_MESSAGE = 'Too many failures! Please try again'
@@ -2018,6 +2018,10 @@ class CaptureMicaZStacksTask(CaptureZStacksTask):
         return poi.name
 
 class SampleDescriptionTask(Task):
+    """
+    A Task that allows the user to write a description of the project.
+    It is stored in sample.txt.
+    """
     def name(self):
         return 'Write or edit the sample description'
     def recommended(self):
@@ -2031,6 +2035,10 @@ class SampleDescriptionTask(Task):
             self.docs.write_sample_description(text)
 
 def get_project_folder():
+    """
+    Request the user's project folder from the user.
+    :returns: The folder chosen as a string.
+    """
     window = Zen.Windows.CreateWindow('Choose folder to work in')
     documents_folder = Zen.Application.Environment.GetFolderPath(ZenSpecialFolder.Documents)
     folder = os.path.join(documents_folder, 'GeochronAtHome')
@@ -2040,6 +2048,18 @@ def get_project_folder():
     return result.GetValue('folder')
 
 def run_a_task(folder):
+    """
+    Display the task list to the user.
+
+    :param: folder: The root folder of the user's project.
+    :returns: False if the user cancelled, True if the user clicked OK and
+    the task ran, whether it was successful, failed or cancelled.
+
+    Each task gets called so it can say if it is available and recommended.
+    All available tasks are put into the select box and all recommended tasks
+    get a * next to their name. The user chooses which task they want and
+    the task is run.
+    """
     docs = Documents(folder)
     task_classes = [
         AddRegistrationPointsTask,
@@ -2101,6 +2121,6 @@ while run_a_task(folder):
   <Author></Author>
   <Description></Description>
   <Keywords></Keywords>
-  <Row>37</Row>
-  <Column>18</Column>
+  <Row>1065</Row>
+  <Column>1</Column>
 </Script>
